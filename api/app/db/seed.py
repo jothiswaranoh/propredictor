@@ -16,7 +16,7 @@ USERS_TO_SEED = [
     {
         "name": "Athu",
         "email": "athu@gmail.com",
-        "employee_id": "HAI-200",
+        "password": "HAI-200",
         "role": "user",
         "active": True,
         "created_at": CREATED_AT,
@@ -40,7 +40,7 @@ async def seed_users() -> None:
 
         # Create indexes
         await db.users.create_index("email", unique=True)
-        await db.users.create_index("employee_id", unique=True)
+        await db.users.create_index("password", unique=True)
 
         seeded_count = 0
 
@@ -49,7 +49,7 @@ async def seed_users() -> None:
                 {
                     "$or": [
                         {"email": user["email"]},
-                        {"employee_id": user["employee_id"]},
+                        {"password": user["password"]},
                     ]
                 }
             )
@@ -57,7 +57,7 @@ async def seed_users() -> None:
             if existing_user:
                 print(
                     f"⚠️ User already exists: "
-                    f"{user['email']} ({user['employee_id']})"
+                    f"{user['email']} ({user['password']})"
                 )
                 continue
 

@@ -27,9 +27,8 @@ async def close_mongo_connection():
 async def init_db():
     db = db_helper.db
     
-    # 1. users: unique email, unique employee_id
+    # 1. users: unique email
     await db.users.create_index("email", unique=True)
-    await db.users.create_index("employee_id", unique=True)
     
     # 2. user_predictions: unique (user_id, match_id)
     await db.user_predictions.create_index([("user_id", 1), ("match_id", 1)], unique=True)
@@ -40,26 +39,21 @@ async def init_db():
 async def seed_default_admin():
     db = db_helper.db
     admin_email = settings.DEFAULT_ADMIN_EMAIL
-    admin_employee_id = settings.DEFAULT_ADMIN_EMPLOYEE_ID
+    admin_password = settings.DEFAULT_ADMIN_PASSWORD
     admin_name = settings.DEFAULT_ADMIN_NAME
     
     existing_admin = await db.users.find_one({"email": admin_email})
     if not existing_admin:
-        # Check if employee_id already exists to prevent conflict
-        existing_emp = await db.users.find_one({"employee_id": admin_employee_id})
-        if existing_emp:
-            logger.warning(f"Employee ID {admin_employee_id} already exists for another user. Cannot seed admin.")
-            return
             
         admin_doc = {
             "name": admin_name,
             "email": admin_email,
-            "employee_id": admin_employee_id,
+            "password": admin_password,
             "role": "admin",
             "active": True,
             "created_at": datetime.utcnow()
         }
         await db.users.insert_one(admin_doc)
-        logger.info(f"Default admin user created: {admin_email} / {admin_employee_id}")
+        logger.info(f"Default admin user created: {admin_email} / {admin_password}")
     else:
         logger.info("Default admin user already exists.")

@@ -3,7 +3,7 @@ from typing import Optional
 
 class LoginRequest(BaseModel):
     email: EmailStr = Field(..., description="Company email address")
-    employee_id: str = Field(..., description="Unique Employee ID")
+    password: str = Field(..., description="Unique Password")
 
 class Token(BaseModel):
     access_token: str

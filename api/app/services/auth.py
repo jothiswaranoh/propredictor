@@ -5,15 +5,26 @@ from app.config import settings
 from app.exceptions import AuthException
 from app.models.user import User
 from app.repositories.user import UserRepository
+from app.schemas.user import UserCreate
 
 class AuthService:
     def __init__(self, user_repo: UserRepository):
         self.user_repo = user_repo
 
-    async def authenticate_user(self, email: str, employee_id: str) -> User:
-        user = await self.user_repo.get_by_email_and_employee_id(email, employee_id)
+    async def register_user(self, user_data: UserCreate) -> User:
+        existing_user = await self.user_repo.get_by_email(user_data.email)
+        if existing_user:
+            raise AuthException("Username already registered")
+        
+        user_dict = user_data.model_dump()
+        user_dict["created_at"] = datetime.utcnow()
+        user = await self.user_repo.create(user_dict)
+        return user
+
+    async def authenticate_user(self, email: str, password: str) -> User:
+        user = await self.user_repo.get_by_email_and_password(email, password)
         if not user:
-            raise AuthException("Invalid email or employee ID")
+            raise AuthException("Invalid username or password")
         if not user.active:
             raise AuthException("User account is inactive")
         return user
