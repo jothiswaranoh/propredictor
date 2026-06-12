@@ -1,4 +1,8 @@
-const BASE_URL = 'http://localhost:8080'
+const getBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8010';
+  return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+};
+const BASE_URL = getBaseUrl();
 
 interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;
@@ -90,7 +94,7 @@ export const api = {
     return request<any[]>('/api/matches/active');
   },
 
-  submitPrediction(matchId: string, winningTeamId: string | null) {
+  submitPrediction(matchId: string, winningTeamId: string) {
     return request<any>(`/api/predictions/${matchId}`, {
       method: 'POST',
       body: JSON.stringify({ winning_team_id: winningTeamId }),
