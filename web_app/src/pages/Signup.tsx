@@ -39,7 +39,7 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative"
       style={{ backgroundImage: `url(${loginWallpaper})` }}
     >
@@ -81,7 +81,7 @@ const Signup: React.FC = () => {
               <Input
                 id="name"
                 type="text"
-                placeholder="John Doe"
+                placeholder="Enter Your Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-purple-500/20"
@@ -97,12 +97,12 @@ const Signup: React.FC = () => {
             >
               <Label htmlFor="email" className="text-gray-300 flex items-center gap-2">
                 <Mail className="w-4 h-4 text-green-400" />
-                Username (Email)
+                Email
               </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="your.email@company.com"
+                placeholder="Enter Your Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50 focus:ring-green-500/20"
@@ -118,12 +118,12 @@ const Signup: React.FC = () => {
             >
               <Label htmlFor="password" className="text-gray-300 flex items-center gap-2">
                 <IdCard className="w-4 h-4 text-blue-400" />
-                Password (Password)
+                Password
               </Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your employee ID"
+                placeholder="Enter your Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20"

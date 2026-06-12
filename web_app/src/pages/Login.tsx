@@ -43,7 +43,7 @@ const Login: React.FC = () => {
 
 
   return (
-    <div 
+    <div
       className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center relative"
       style={{ backgroundImage: `url(${loginWallpaper})` }}
     >
@@ -80,12 +80,12 @@ const Login: React.FC = () => {
             >
               <Label htmlFor="email" className="text-gray-300 flex items-center gap-2">
                 <Mail className="w-4 h-4 text-green-400" />
-                Email Address
+                Email
               </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="your.email@company.com"
+                placeholder="Enter Your Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50 focus:ring-green-500/20"
@@ -99,14 +99,23 @@ const Login: React.FC = () => {
               transition={{ delay: 0.4 }}
               className="space-y-2"
             >
-              <Label htmlFor="password" className="text-gray-300 flex items-center gap-2">
-                <IdCard className="w-4 h-4 text-blue-400" />
-                Password
-              </Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password" className="text-gray-300 flex items-center gap-2">
+                  <IdCard className="w-4 h-4 text-blue-400" />
+                  Password
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => toast({ title: "Forgot Password", description: "Please Contact Admin to Reset Password" })}
+                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <Input
                 id="password"
-                type="text"
-                placeholder="Enter your employee ID"
+                type="password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20"
