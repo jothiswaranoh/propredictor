@@ -3,9 +3,10 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Trophy, Clock, Calendar, TrendingUp, ChevronRight,
-  LogOut, User, Target, Flame, Crown, ArrowUpRight, CheckCircle2
+  LogOut, User, Target, Flame, Crown, ArrowUpRight, CheckCircle2, Eye, EyeOff
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
@@ -21,6 +22,7 @@ import {
   DialogFooter,
   DialogDescription
 } from '../components/ui/dialog';
+import { ProfileDialog } from '../components/ProfileDialog';
 
 const mapBackendMatchToFrontend = (m: any): Match => {
   const dateObj = new Date(m.match_date);
@@ -107,6 +109,17 @@ const Dashboard: React.FC = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submittingPrediction, setSubmittingPrediction] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  const handleUpdateProfile = async (newName: string) => {
+    const updatedUser = await api.updateProfile(newName);
+    setUserProfile(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
+  const handleResetPassword = async (newPassword: string) => {
+    await api.updatePassword(newPassword);
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -187,8 +200,8 @@ const Dashboard: React.FC = () => {
     const predictedTeamId = pendingSelection === 'draw'
       ? null
       : pendingSelection === 'home'
-      ? selectedMatch.homeTeam.id
-      : selectedMatch.awayTeam.id;
+        ? selectedMatch.homeTeam.id
+        : selectedMatch.awayTeam.id;
     try {
       setSubmittingPrediction(true);
       await api.submitPrediction(selectedMatch.id, predictedTeamId);
@@ -198,10 +211,10 @@ const Dashboard: React.FC = () => {
       toast({
         title: isUpdate ? "Prediction Updated!" : "Prediction Recorded!",
         description: `Your prediction has been set to ${pendingSelection === 'home'
-            ? selectedMatch.homeTeam.shortName
-            : pendingSelection === 'away'
-              ? selectedMatch.awayTeam.shortName
-              : 'Draw'
+          ? selectedMatch.homeTeam.shortName
+          : pendingSelection === 'away'
+            ? selectedMatch.awayTeam.shortName
+            : 'Draw'
           }.`,
       });
 
@@ -266,7 +279,10 @@ const Dashboard: React.FC = () => {
                   <span className="text-sm font-medium">{userRank?.points || 0} pts</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center">
+                  <div 
+                    className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-white/50 transition-all"
+                    onClick={() => setProfileOpen(true)}
+                  >
                     <User className="w-5 h-5 text-white" />
                   </div>
                   <Button
@@ -437,11 +453,78 @@ const Dashboard: React.FC = () => {
             </div>
           </motion.section>
 
+          {upcomingMatches.length > 0 && (
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="mb-10"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-200 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-green-400" />
+                  Upcoming Matches
+                </h3>
+                <Button variant="outline" size="sm" className="border-white/10 text-gray-300">
+                  View All <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {upcomingMatches.map((match, idx) => (
+                  <motion.div
+                    key={match.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 * idx }}
+                  >
+                    <Card
+                      onClick={() => setSelectedMatch(match)}
+                      className={`glass-card p-5 group hover:border-green-500/30 transition-all cursor-pointer border ${selectedMatch?.id === match.id ? 'border-green-500/50 ring-1 ring-green-500/30' : 'border-white/10'
+                        }`}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <Badge variant="secondary" className="bg-blue-500/10 text-blue-400">
+                          {match.competition}
+                        </Badge>
+                        <span className="text-xs text-gray-500">{match.date}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-center flex-1">
+                          <img src={match.homeTeam.logo} alt="" className="w-12 h-12 mx-auto mb-2 object-contain" />
+                          <p className="text-sm font-medium text-gray-200">{match.homeTeam.shortName}</p>
+                        </div>
+                        <div className="px-4">
+                          <span className="text-lg font-bold text-gray-400">VS</span>
+                        </div>
+                        <div className="text-center flex-1">
+                          <img src={match.awayTeam.logo} alt="" className="w-12 h-12 mx-auto mb-2 object-contain" />
+                          <p className="text-sm font-medium text-gray-200">{match.awayTeam.shortName}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
+                        <span className="text-xs text-gray-500">{match.time}</span>
+                        {predHistory.find(p => p.matchId === match.id) ? (
+                          <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Predicted
+                          </Badge>
+                        ) : (
+                          <Button variant="ghost" size="sm" className="text-green-400 group-hover:text-green-300">
+                            Predict <ArrowUpRight className="w-3 h-3 ml-1" />
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.section>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+              transition={{ delay: 0.3 }}
             >
               <Card className="glass-card p-6 h-full">
                 <div className="flex items-center justify-between mb-4">
@@ -476,7 +559,7 @@ const Dashboard: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.4 }}
             >
               <Card className="glass-card p-6 h-full">
                 <div className="flex items-center justify-between mb-4">
@@ -530,7 +613,7 @@ const Dashboard: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+              transition={{ delay: 0.5 }}
             >
               <Card className="glass-card p-6 h-full">
                 <div className="flex items-center justify-between mb-4">
@@ -551,9 +634,9 @@ const Dashboard: React.FC = () => {
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-500 text-black' :
-                            idx === 1 ? 'bg-gray-300 text-black' :
-                              idx === 2 ? 'bg-amber-600 text-black' :
-                                'bg-gray-700 text-white'
+                          idx === 1 ? 'bg-gray-300 text-black' :
+                            idx === 2 ? 'bg-amber-600 text-black' :
+                              'bg-gray-700 text-white'
                           }`}>
                           {entry.rank}
                         </div>
@@ -578,70 +661,6 @@ const Dashboard: React.FC = () => {
               </Card>
             </motion.div>
           </div>
-
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-200 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-green-400" />
-                Upcoming Matches
-              </h3>
-              <Button variant="outline" size="sm" className="border-white/10 text-gray-300">
-                View All <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {upcomingMatches.map((match, idx) => (
-                <motion.div
-                  key={match.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 * idx }}
-                >
-                  <Card
-                    onClick={() => setSelectedMatch(match)}
-                    className={`glass-card p-5 group hover:border-green-500/30 transition-all cursor-pointer border ${selectedMatch?.id === match.id ? 'border-green-500/50 ring-1 ring-green-500/30' : 'border-white/10'
-                      }`}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <Badge variant="secondary" className="bg-blue-500/10 text-blue-400">
-                        {match.competition}
-                      </Badge>
-                      <span className="text-xs text-gray-500">{match.date}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-center flex-1">
-                        <img src={match.homeTeam.logo} alt="" className="w-12 h-12 mx-auto mb-2 object-contain" />
-                        <p className="text-sm font-medium text-gray-200">{match.homeTeam.shortName}</p>
-                      </div>
-                      <div className="px-4">
-                        <span className="text-lg font-bold text-gray-400">VS</span>
-                      </div>
-                      <div className="text-center flex-1">
-                        <img src={match.awayTeam.logo} alt="" className="w-12 h-12 mx-auto mb-2 object-contain" />
-                        <p className="text-sm font-medium text-gray-200">{match.awayTeam.shortName}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
-                      <span className="text-xs text-gray-500">{match.time}</span>
-                      {predHistory.find(p => p.matchId === match.id) ? (
-                        <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Predicted
-                        </Badge>
-                      ) : (
-                        <Button variant="ghost" size="sm" className="text-green-400 group-hover:text-green-300">
-                          Predict <ArrowUpRight className="w-3 h-3 ml-1" />
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
         </main>
 
         {/* Confirmation Dialog */}
@@ -775,6 +794,14 @@ const Dashboard: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ProfileDialog
+          open={profileOpen}
+          onOpenChange={setProfileOpen}
+          userProfile={userProfile}
+          onUpdateProfile={handleUpdateProfile}
+          onResetPassword={handleResetPassword}
+        />
       </div>
     </div>
   );
