@@ -403,7 +403,7 @@ const Dashboard: React.FC = () => {
                           className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-4 object-contain"
                         />
                         <h3 className="font-semibold text-white mb-1">{selectedMatch?.awayTeam.shortName}</h3>
-                        <p className="text-xs text-gray-400">{selectedMatch?.awayTeam.name}</p>
+                        <p className="text-xs text-gray-400">{selectedMatch?.awayTeam?.name}</p>
                         {pendingSelection === 'away' && (
                           <motion.div
                             initial={{ scale: 0 }}
