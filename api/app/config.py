@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=1440)
     
     DEFAULT_ADMIN_EMAIL: str = Field(default="admin@company.com")
-    DEFAULT_ADMIN_EMPLOYEE_ID: str = Field(default="EMP001")
+    DEFAULT_ADMIN_PASSWORD: str = Field(default="EMP001")
     DEFAULT_ADMIN_NAME: str = Field(default="System Administrator")
     
     model_config = SettingsConfigDict(

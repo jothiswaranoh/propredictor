@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, IdCard, ArrowRight, Shield, Trophy, Users } from 'lucide-react';
+import { Mail, IdCard, ArrowRight, Shield, Trophy, Users, User } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -9,7 +9,8 @@ import { api } from '../lib/api';
 import { useToast } from '../hooks/use-toast';
 import loginWallpaper from '../assets/login_wallpaper.jpg';
 
-const Login: React.FC = () => {
+const Signup: React.FC = () => {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -20,27 +21,22 @@ const Login: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const user = await api.login(email, password);
+      await api.signup(name, email, password);
       toast({
-        title: "Login Successful",
-        description: `Welcome back, ${user.name}!`,
+        title: "Signup Successful",
+        description: "You have successfully signed up! Please login.",
       });
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate('/');
     } catch (err: any) {
       toast({
-        title: "Login Failed",
-        description: err.message || "Invalid company email or employee ID",
+        title: "Signup Failed",
+        description: err.message || "Failed to sign up",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
-
 
   return (
     <div 
@@ -68,7 +64,7 @@ const Login: React.FC = () => {
             <h1 className="text-3xl md:text-4xl font-bold mb-2">
               <span className="text-gradient">ProPredictor</span>
             </h1>
-            <p className="text-gray-400 text-sm">Champions League Prediction League</p>
+            <p className="text-gray-400 text-sm">Create an Account</p>
           </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -78,9 +74,30 @@ const Login: React.FC = () => {
               transition={{ delay: 0.3 }}
               className="space-y-2"
             >
+              <Label htmlFor="name" className="text-gray-300 flex items-center gap-2">
+                <User className="w-4 h-4 text-purple-400" />
+                Full Name
+              </Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="John Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500/50 focus:ring-purple-500/20"
+                required
+              />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+              className="space-y-2"
+            >
               <Label htmlFor="email" className="text-gray-300 flex items-center gap-2">
                 <Mail className="w-4 h-4 text-green-400" />
-                Email Address
+                Username (Email)
               </Label>
               <Input
                 id="email"
@@ -96,16 +113,16 @@ const Login: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
+              transition={{ delay: 0.5 }}
               className="space-y-2"
             >
               <Label htmlFor="password" className="text-gray-300 flex items-center gap-2">
                 <IdCard className="w-4 h-4 text-blue-400" />
-                Password
+                Password (Password)
               </Label>
               <Input
                 id="password"
-                type="text"
+                type="password"
                 placeholder="Enter your employee ID"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -117,7 +134,7 @@ const Login: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+              transition={{ delay: 0.6 }}
             >
               <Button
                 type="submit"
@@ -131,11 +148,11 @@ const Login: React.FC = () => {
                       transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
                       className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                     />
-                    Signing in...
+                    Signing up...
                   </div>
                 ) : (
                   <span className="flex items-center justify-center gap-2">
-                    Sign In
+                    Sign Up
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </span>
                 )}
@@ -146,13 +163,13 @@ const Login: React.FC = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 0.7 }}
             className="mt-6 text-center"
           >
             <p className="text-sm text-gray-400">
-              Don't have an account?{' '}
-              <Link to="/signup" className="text-green-400 hover:text-green-300 transition-colors font-medium">
-                Sign Up
+              Already have an account?{' '}
+              <Link to="/" className="text-green-400 hover:text-green-300 transition-colors font-medium">
+                Log In
               </Link>
             </p>
           </motion.div>
@@ -160,7 +177,7 @@ const Login: React.FC = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.7 }}
+            transition={{ delay: 0.8 }}
             className="mt-8 pt-6 border-t border-white/10"
           >
             <div className="grid grid-cols-3 gap-4 text-center">
@@ -168,7 +185,7 @@ const Login: React.FC = () => {
                 <div className="flex justify-center">
                   <Shield className="w-6 h-6 text-green-400/70" />
                 </div>
-                <p className="text-xs text-gray-500">Secure Login</p>
+                <p className="text-xs text-gray-500">Secure</p>
               </div>
               <div className="space-y-1">
                 <div className="flex justify-center">
@@ -196,4 +213,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login;
+export default Signup;

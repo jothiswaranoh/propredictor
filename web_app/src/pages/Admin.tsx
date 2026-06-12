@@ -95,7 +95,7 @@ const Admin: React.FC = () => {
   // Add User Form States
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserEmployeeId, setNewUserEmployeeId] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState('user');
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<any | null>(null);
@@ -116,7 +116,7 @@ const Admin: React.FC = () => {
       setEditingUser(null);
       setNewUserName('');
       setNewUserEmail('');
-      setNewUserEmployeeId('');
+      setNewUserPassword('');
       setNewUserRole('user');
     }
   }, [userDialogOpen]);
@@ -246,7 +246,7 @@ const Admin: React.FC = () => {
   };
 
   const handleCreateUser = async () => {
-    if (!newUserName || !newUserEmail || !newUserEmployeeId) {
+    if (!newUserName || !newUserEmail || !newUserPassword) {
       toast({ title: "Validation Error", description: "All fields are required.", variant: "destructive" });
       return;
     }
@@ -255,7 +255,7 @@ const Admin: React.FC = () => {
         await api.adminUpdateUser(editingUser.id, {
           name: newUserName,
           email: newUserEmail,
-          employee_id: newUserEmployeeId,
+          password: newUserPassword,
           role: newUserRole,
         });
         toast({ title: "User Updated", description: `Successfully updated ${newUserName}!` });
@@ -263,7 +263,7 @@ const Admin: React.FC = () => {
         await api.adminCreateUser({
           name: newUserName,
           email: newUserEmail,
-          employee_id: newUserEmployeeId,
+          password: newUserPassword,
           role: newUserRole,
         });
         toast({ title: "User Created", description: `Successfully added ${newUserName}!` });
@@ -271,7 +271,7 @@ const Admin: React.FC = () => {
       setUserDialogOpen(false);
       setNewUserName('');
       setNewUserEmail('');
-      setNewUserEmployeeId('');
+      setNewUserPassword('');
       setNewUserRole('user');
       setEditingUser(null);
       fetchTabEntries();
@@ -572,7 +572,7 @@ const Admin: React.FC = () => {
                               setEditingUser(row);
                               setNewUserName(String((row as any)?.name ?? ''));
                               setNewUserEmail(String((row as any)?.email ?? ''));
-                              setNewUserEmployeeId(String((row as any)?.employee_id ?? (row as any)?.employeeId ?? ''));
+                              setNewUserPassword(String((row as any)?.password ?? (row as any)?.password ?? ''));
                               setNewUserRole(String((row as any)?.role ?? 'user'));
                               setUserDialogOpen(true);
                             }}
@@ -874,7 +874,7 @@ const Admin: React.FC = () => {
           </div>
         )
       },
-      { key: 'employee_id', label: 'Employee ID' },
+      { key: 'password', label: 'Password' },
       {
         key: 'role', label: 'Role', render: (value: any) => (
           <Badge className={value === 'admin' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}>
@@ -926,11 +926,11 @@ const Admin: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-gray-300">Employee ID</Label>
+                  <Label className="text-gray-300">Password</Label>
                   <Input
                     placeholder="EMP001"
-                    value={newUserEmployeeId}
-                    onChange={e => setNewUserEmployeeId(e.target.value)}
+                    value={newUserPassword}
+                    onChange={e => setNewUserPassword(e.target.value)}
                     className="bg-white/5 border-white/10 text-white"
                   />
                 </div>

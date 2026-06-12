@@ -128,9 +128,9 @@ To run the automated integration tests:
 
 ## JWT Authentication Flow
 
-This system uses a **password-less authentication model** using **Company Email** and **Employee ID**:
+This system uses a **password-less authentication model** using **Company Email** and **Password**:
 
-1. **Request**: The user requests a JWT by sending their `email` and `employee_id` to `/api/auth/login`.
+1. **Request**: The user requests a JWT by sending their `email` and `password` to `/api/auth/login`.
 2. **Verification**: The system looks up the database. If the user is active and records match, a JWT token is signed.
 3. **Payload**: The token payload contains:
    - `sub`: User ID

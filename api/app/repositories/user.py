@@ -10,6 +10,6 @@ class UserRepository(BaseRepository[User]):
         doc = await self.collection.find_one({"email": email})
         return self.model(**doc) if doc else None
 
-    async def get_by_email_and_employee_id(self, email: str, employee_id: str) -> Optional[User]:
-        doc = await self.collection.find_one({"email": email, "employee_id": employee_id})
+    async def get_by_email_and_password(self, email: str, password: str) -> Optional[User]:
+        doc = await self.collection.find_one({"email": email, "password": password})
         return self.model(**doc) if doc else None

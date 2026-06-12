@@ -24,10 +24,10 @@ class UserService:
         if existing_email:
             raise ConflictException("Email already exists")
         
-        # Check duplicate employee_id
-        existing_emp = await self.user_repo.get_all(filter_query={"employee_id": user_data.employee_id})
+        # Check duplicate password
+        existing_emp = await self.user_repo.get_all(filter_query={"password": user_data.password})
         if existing_emp:
-            raise ConflictException("Employee ID already exists")
+            raise ConflictException("Password already exists")
 
         user_dict = user_data.model_dump()
         user_dict["created_at"] = datetime.utcnow()
@@ -43,10 +43,10 @@ class UserService:
             if existing:
                 raise ConflictException("Email already exists")
 
-        if "employee_id" in update_dict and update_dict["employee_id"] != user.employee_id:
-            existing = await self.user_repo.get_all(filter_query={"employee_id": update_dict["employee_id"]})
+        if "password" in update_dict and update_dict["password"] != user.password:
+            existing = await self.user_repo.get_all(filter_query={"password": update_dict["password"]})
             if existing:
-                raise ConflictException("Employee ID already exists")
+                raise ConflictException("Password already exists")
 
         return await self.user_repo.update(user_id, update_dict)
 

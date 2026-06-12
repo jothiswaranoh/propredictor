@@ -1,4 +1,4 @@
-const BASE_URL = 'https://propredictor.selfmade.games/';
+const BASE_URL = 'http://localhost:8080'
 
 interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;
@@ -50,18 +50,26 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
 export const api = {
   // Auth API
-  async login(email: string, employeeId: string) {
+  async login(email: string, password: string) {
     const data = await request<{ access_token: string }>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, employee_id: employeeId }),
+      body: JSON.stringify({ email, password: password }),
       requiresAuth: false,
     });
     localStorage.setItem('token', data.access_token);
-    
+
     // Fetch profile immediately
     const userProfile = await this.getCurrentUser();
     localStorage.setItem('user', JSON.stringify(userProfile));
     return userProfile;
+  },
+
+  async signup(name: string, email: string, password: string) {
+    return request<any>('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password: password }),
+      requiresAuth: false,
+    });
   },
 
   logout() {
@@ -168,14 +176,14 @@ export const api = {
     return request<any[]>('/api/admin/users');
   },
 
-  adminCreateUser(data: { name: string; email: string; employee_id: string; role?: string; active?: boolean }) {
+  adminCreateUser(data: { name: string; email: string; password: string; role?: string; active?: boolean }) {
     return request<any>('/api/admin/users', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  adminUpdateUser(id: string, data: { name?: string; email?: string; employee_id?: string; role?: string; active?: boolean }) {
+  adminUpdateUser(id: string, data: { name?: string; email?: string; password?: string; role?: string; active?: boolean }) {
     return request<any>(`/api/admin/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
