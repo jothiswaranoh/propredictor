@@ -9,6 +9,7 @@ class UserBase(BaseModel):
     password: str = Field(..., min_length=2, max_length=50)
     role: str = Field(default="user", pattern="^(admin|user)$")
     active: bool = True
+    avatar: Optional[str] = None
 
 class UserCreate(UserBase):
     pass
@@ -19,6 +20,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(None, min_length=2, max_length=50)
     role: Optional[str] = Field(None, pattern="^(admin|user)$")
     active: Optional[bool] = None
+    avatar: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: str
@@ -27,6 +29,7 @@ class UserResponse(BaseModel):
     password: str
     role: str
     active: bool
+    avatar: Optional[str] = None
     created_at: ISTDateTime
 
     model_config = {

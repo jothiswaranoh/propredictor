@@ -25,7 +25,8 @@ class LeaderboardService:
                     name=entry["name"],
                     email=entry["email"],
                     points=entry["points"],
-                    rank=entry["rank"]
+                    rank=entry["rank"],
+                    avatar=entry.get("avatar")
                 ) for entry in cache_entries
             ]
             return LeaderboardResponse(leaderboard=entries)
@@ -62,6 +63,7 @@ class LeaderboardService:
                     "_id": 1,
                     "name": 1,
                     "email": 1,
+                    "avatar": 1,
                     "is_correct": {
                         "$cond": [
                             {
@@ -81,6 +83,7 @@ class LeaderboardService:
                     "_id": "$_id",
                     "name": { "$first": "$name" },
                     "email": { "$first": "$email" },
+                    "avatar": { "$first": "$avatar" },
                     "points": { "$sum": "$is_correct" }
                 }
             },
@@ -110,6 +113,7 @@ class LeaderboardService:
                 "user_id": str(row["_id"]),
                 "name": row["name"],
                 "email": row["email"],
+                "avatar": row.get("avatar"),
                 "points": points,
                 "rank": current_rank,
                 "calculated_at": datetime.utcnow()
@@ -130,7 +134,8 @@ class LeaderboardService:
                     name=entry["name"],
                     email=entry["email"],
                     points=entry["points"],
-                    rank=entry["rank"]
+                    rank=entry["rank"],
+                    avatar=entry.get("avatar")
                 ) for entry in entries
             ]
         )

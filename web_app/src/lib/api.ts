@@ -85,10 +85,10 @@ export const api = {
     return request<any>('/api/users/me');
   },
 
-  updateProfile(name: string) {
+  updateProfile(name: string, avatar?: string) {
     return request<any>('/api/users/me', {
       method: 'PUT',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, avatar }),
     });
   },
 

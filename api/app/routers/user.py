@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Path
-from typing import List
+from typing import List, Optional
 from app.models.user import User
 from app.schemas.user import UserResponse
 from app.schemas.match import MatchDetailResponse
@@ -20,6 +20,7 @@ class PasswordUpdate(BaseModel):
 
 class ProfileUpdate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
+    avatar: Optional[str] = None
 from app.services.match import MatchService
 from app.services.prediction import PredictionService
 from app.services.leaderboard import LeaderboardService
@@ -42,7 +43,11 @@ async def update_my_profile(
     """
     Update the authenticated user's profile.
     """
-    updated_user = await user_repo.update(str(current_user.id), {"name": profile_data.name})
+    update_data = {"name": profile_data.name}
+    if profile_data.avatar is not None:
+        update_data["avatar"] = profile_data.avatar
+
+    updated_user = await user_repo.update(str(current_user.id), update_data)
     return updated_user
 
 @router.put("/api/users/me/password", response_model=UserResponse)
