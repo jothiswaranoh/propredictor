@@ -26,34 +26,17 @@ async def close_mongo_connection():
 
 async def init_db():
     db = db_helper.db
-    
+
     # 1. users: unique email
     await db.users.create_index("email", unique=True)
+
+    # Drop outdated unique employee_id index if it exists
+    try:
+        await db.users.drop_index("employee_id_1")
+        logger.info("Successfully dropped outdated unique index 'employee_id_1' from users collection.")
+    except Exception:
+        pass
     
     # 2. user_predictions: unique (user_id, match_id)
     await db.user_predictions.create_index([("user_id", 1), ("match_id", 1)], unique=True)
     
-    # 3. seed default admin
-    await seed_default_admin()
-
-async def seed_default_admin():
-    db = db_helper.db
-    admin_email = settings.DEFAULT_ADMIN_EMAIL
-    admin_password = settings.DEFAULT_ADMIN_PASSWORD
-    admin_name = settings.DEFAULT_ADMIN_NAME
-    
-    existing_admin = await db.users.find_one({"email": admin_email})
-    if not existing_admin:
-            
-        admin_doc = {
-            "name": admin_name,
-            "email": admin_email,
-            "password": admin_password,
-            "role": "admin",
-            "active": True,
-            "created_at": datetime.utcnow()
-        }
-        await db.users.insert_one(admin_doc)
-        logger.info(f"Default admin user created: {admin_email} / {admin_password}")
-    else:
-        logger.info("Default admin user already exists.")
