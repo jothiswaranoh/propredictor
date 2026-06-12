@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from app.models.team import Team
 from app.repositories.team import TeamRepository
 from app.schemas.team import TeamCreate, TeamUpdate
@@ -42,3 +42,35 @@ class TeamService:
     async def delete_team(self, team_id: str) -> bool:
         await self.get_team_by_id(team_id)
         return await self.team_repo.delete(team_id)
+
+    async def get_paginated_teams(
+        self,
+        page: int = 1,
+        limit: int = 20,
+        search: Optional[str] = None,
+        active: Optional[bool] = None
+    ) -> dict:
+        filter_query = {}
+        if search:
+            filter_query["$or"] = [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"short_name": {"$regex": search, "$options": "i"}}
+            ]
+        if active is not None:
+            filter_query["active"] = active
+            
+        teams, total = await self.team_repo.get_paginated(
+            filter_query=filter_query,
+            sort_by="name",
+            page=page,
+            limit=limit
+        )
+        
+        pages = (total + limit - 1) // limit if limit > 0 else 0
+        return {
+            "teams": teams,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "pages": pages
+        }

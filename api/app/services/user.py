@@ -43,3 +43,42 @@ class UserService:
     async def delete_user(self, user_id: str) -> bool:
         await self.get_user_by_id(user_id)
         return await self.user_repo.delete(user_id)
+
+    async def get_paginated_users(
+        self,
+        page: int = 1,
+        limit: int = 20,
+        search: Optional[str] = None,
+        role: Optional[str] = None,
+        active: Optional[bool] = None
+    ):
+        filter_query = {}
+        
+        if search:
+            filter_query["$or"] = [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"email": {"$regex": search, "$options": "i"}}
+            ]
+            
+        if role:
+            filter_query["role"] = role
+            
+        if active is not None:
+            filter_query["active"] = active
+            
+        users, total = await self.user_repo.get_paginated(
+            filter_query=filter_query,
+            sort_by="name",
+            page=page,
+            limit=limit
+        )
+        
+        pages = (total + limit - 1) // limit if limit > 0 else 0
+        
+        return {
+            "users": users,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "pages": pages
+        }

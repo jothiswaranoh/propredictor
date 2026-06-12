@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, HttpUrl
 from app.schemas import ISTDateTime
 
@@ -29,3 +29,10 @@ class TeamResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+class TeamPaginatedResponse(BaseModel):
+    teams: List[TeamResponse]
+    total: int
+    page: int
+    limit: int
+    pages: int

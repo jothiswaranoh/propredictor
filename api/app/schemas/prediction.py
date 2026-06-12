@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from app.schemas.match import MatchDetailResponse
 from app.schemas import ISTDateTime
@@ -31,3 +31,18 @@ class PredictionDetailResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+class PredictionPaginatedResponse(BaseModel):
+    predictions: List[PredictionDetailResponse]
+    total: int
+    page: int
+    limit: int
+    pages: int
+
+class AdminDashboardStatsResponse(BaseModel):
+    total_users: int
+    total_teams: int
+    active_matches: int
+    total_predictions: int
+    recent_predictions: List[PredictionDetailResponse]
+

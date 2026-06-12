@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, Path, status
-from typing import List
+from fastapi import APIRouter, Depends, Path, status, Query
+from typing import List, Optional
 from app.models.user import User
-from app.schemas.team import TeamCreate, TeamUpdate, TeamResponse
-from app.schemas.match import MatchCreate, MatchUpdate, MatchResponse, MatchDetailResponse, MatchResultUpdate
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
-from app.schemas.prediction import PredictionDetailResponse
+from app.schemas.team import TeamCreate, TeamUpdate, TeamResponse, TeamPaginatedResponse
+from app.schemas.match import MatchCreate, MatchUpdate, MatchResponse, MatchDetailResponse, MatchResultUpdate, MatchPaginatedResponse
+from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserPaginatedResponse
+from app.schemas.prediction import PredictionDetailResponse, PredictionPaginatedResponse, AdminDashboardStatsResponse
 from app.schemas.leaderboard import LeaderboardResponse
 from app.dependencies import (
     require_admin,
@@ -34,14 +34,23 @@ async def create_team(
     """
     return await team_service.create_team(team_data)
 
-@router.get("/teams", response_model=List[TeamResponse])
+@router.get("/teams", response_model=TeamPaginatedResponse)
 async def list_teams(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    active: Optional[bool] = Query(None),
     team_service: TeamService = Depends(get_team_service)
 ):
     """
-    List all teams (active and inactive).
+    List all teams with server-side pagination, search, and status filtering.
     """
-    return await team_service.get_all_teams(active_only=False)
+    return await team_service.get_paginated_teams(
+        page=page,
+        limit=limit,
+        search=search,
+        active=active
+    )
 
 @router.get("/teams/{team_id}", response_model=TeamResponse)
 async def get_team(
@@ -87,14 +96,23 @@ async def create_match(
     """
     return await match_service.create_match(match_data)
 
-@router.get("/matches", response_model=List[MatchDetailResponse])
+@router.get("/matches", response_model=MatchPaginatedResponse)
 async def list_matches(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
     match_service: MatchService = Depends(get_match_service)
 ):
     """
-    List all matches with team details.
+    List all matches with team details and pagination.
     """
-    return await match_service.get_all_matches_detailed()
+    return await match_service.get_paginated_matches_detailed(
+        page=page,
+        limit=limit,
+        search=search,
+        status=status
+    )
 
 @router.get("/matches/{match_id}", response_model=MatchDetailResponse)
 async def get_match(
@@ -141,14 +159,25 @@ async def create_user(
     """
     return await user_service.create_user(user_data)
 
-@router.get("/users", response_model=List[UserResponse])
+@router.get("/users", response_model=UserPaginatedResponse)
 async def list_users(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    active: Optional[bool] = Query(None),
     user_service: UserService = Depends(get_user_service)
 ):
     """
-    List all registered users.
+    List registered users with server-side pagination, search, and filtering.
     """
-    return await user_service.get_all_users()
+    return await user_service.get_paginated_users(
+        page=page,
+        limit=limit,
+        search=search,
+        role=role,
+        active=active
+    )
 
 @router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(
@@ -183,15 +212,35 @@ async def delete_user(
 
 # --- Predictions and Leaderboard Action APIs ---
 
-@router.get("/predictions", response_model=List[PredictionDetailResponse])
+@router.get("/predictions", response_model=PredictionPaginatedResponse)
 async def view_predictions(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
     prediction_service: PredictionService = Depends(get_prediction_service),
     match_service: MatchService = Depends(get_match_service)
 ):
     """
-    View predictions submitted by all users.
+    View predictions submitted by all users with server-side pagination, search, and filtering.
     """
-    return await prediction_service.get_all_predictions_detailed(match_service=match_service)
+    return await prediction_service.get_paginated_predictions_detailed(
+        match_service=match_service,
+        page=page,
+        limit=limit,
+        search=search,
+        status=status
+    )
+
+@router.get("/dashboard/stats", response_model=AdminDashboardStatsResponse)
+async def view_dashboard_stats(
+    prediction_service: PredictionService = Depends(get_prediction_service),
+    match_service: MatchService = Depends(get_match_service)
+):
+    """
+    Get all counts and statistics required for the Admin dashboard in a single network call.
+    """
+    return await prediction_service.get_dashboard_stats(match_service=match_service)
 
 @router.delete("/predictions/{prediction_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_prediction(

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, model_validator
 from app.schemas.team import TeamResponse
 from app.schemas import ISTDateTime
@@ -78,3 +78,10 @@ class MatchDetailResponse(BaseModel):
 class MatchResultUpdate(BaseModel):
     winning_team_id: Optional[str] = Field(default=None, description="ID of winning team, or null/None if draw")
     status: str = Field(default="completed", pattern="^completed$")
+
+class MatchPaginatedResponse(BaseModel):
+    matches: List[MatchDetailResponse]
+    total: int
+    page: int
+    limit: int
+    pages: int

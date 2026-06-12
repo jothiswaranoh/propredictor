@@ -125,8 +125,11 @@ export const api = {
 
   // Admin APIs
   // Teams
-  adminGetTeams() {
-    return request<any[]>('/api/admin/teams');
+  adminGetTeams(page = 1, limit = 20, search = '', active: boolean | null = null) {
+    let url = `/api/admin/teams?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (active !== null) url += `&active=${active}`;
+    return request<{ teams: any[]; total: number; page: number; limit: number; pages: number }>(url);
   },
 
   adminCreateTeam(name: string, shortName: string, logoUrl: string) {
@@ -150,8 +153,11 @@ export const api = {
   },
 
   // Matches
-  adminGetMatches() {
-    return request<any[]>('/api/admin/matches');
+  adminGetMatches(page = 1, limit = 20, search = '', status = '') {
+    let url = `/api/admin/matches?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (status) url += `&status=${encodeURIComponent(status)}`;
+    return request<{ matches: any[]; total: number; page: number; limit: number; pages: number }>(url);
   },
 
   adminCreateMatch(data: {
@@ -190,8 +196,12 @@ export const api = {
   },
 
   // Users
-  adminGetUsers() {
-    return request<any[]>('/api/admin/users');
+  adminGetUsers(page = 1, limit = 20, search = '', role = '', active: boolean | null = null) {
+    let url = `/api/admin/users?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (role) url += `&role=${encodeURIComponent(role)}`;
+    if (active !== null) url += `&active=${active}`;
+    return request<{ users: any[]; total: number; page: number; limit: number; pages: number }>(url);
   },
 
   adminCreateUser(data: { name: string; email: string; password: string; role?: string; active?: boolean }) {
@@ -230,8 +240,21 @@ export const api = {
   },
 
   // Predictions
-  adminGetPredictions() {
-    return request<any[]>('/api/admin/predictions');
+  adminGetPredictions(page = 1, limit = 20, search = '', status = '') {
+    let url = `/api/admin/predictions?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (status) url += `&status=${encodeURIComponent(status)}`;
+    return request<{ predictions: any[]; total: number; page: number; limit: number; pages: number }>(url);
+  },
+
+  adminGetDashboardStats() {
+    return request<{
+      total_users: number;
+      total_teams: number;
+      active_matches: number;
+      total_predictions: number;
+      recent_predictions: any[];
+    }>('/api/admin/dashboard/stats');
   },
 
   adminDeletePrediction(id: string) {

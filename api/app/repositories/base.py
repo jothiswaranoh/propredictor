@@ -40,6 +40,28 @@ class BaseRepository(Generic[ModelType]):
         docs = await cursor.to_list(length=1000)
         return [self.model(**doc) for doc in docs]
 
+    async def get_paginated(
+        self,
+        filter_query: Dict[str, Any] = None,
+        sort_by: str = None,
+        descending: bool = False,
+        page: int = 1,
+        limit: int = 20
+    ) -> tuple[List[ModelType], int]:
+        query = filter_query or {}
+        total = await self.collection.count_documents(query)
+        
+        cursor = self.collection.find(query)
+        if sort_by:
+            direction = -1 if descending else 1
+            cursor = cursor.sort(sort_by, direction)
+            
+        skip = (page - 1) * limit
+        cursor = cursor.skip(skip).limit(limit)
+        
+        docs = await cursor.to_list(length=limit)
+        return [self.model(**doc) for doc in docs], total
+
     async def create(self, document_dict: Dict[str, Any]) -> ModelType:
         if "active" not in document_dict:
             document_dict["active"] = True

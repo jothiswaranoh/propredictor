@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Trophy, Calendar, TrendingUp, LogOut, Menu, X, Shield,
-  ChevronRight, Search, Plus, Edit, Trash2, Download, Filter, MoreVertical, RefreshCw
+  ChevronRight, Search, Plus, Edit, Trash2, Download, Filter, MoreVertical, RefreshCw, Eye, EyeOff
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -64,6 +65,7 @@ const formatDatetimeLocal = (isoString?: string) => {
 };
 
 const Admin: React.FC = () => {
+  const perpage_value = 10;
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -75,6 +77,104 @@ const Admin: React.FC = () => {
   const [matchesList, setMatchesList] = useState<any[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [predictionsList, setPredictionsList] = useState<any[]>([]);
+
+  // Paginated Users list states
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [userSearch, setUserSearch] = useState('');
+  const [debouncedUserSearch, setDebouncedUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('');
+  const [userActiveFilter, setUserActiveFilter] = useState<boolean | null>(null);
+  const [userPage, setUserPage] = useState(1);
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+
+  const togglePasswordVisibility = (userId: string) => {
+    setVisiblePasswords(prev => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedUserSearch(userSearch);
+      setUserPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [userSearch]);
+
+  const { data: paginatedUsersData, isLoading: isUsersLoading, refetch: refetchUsers } = useQuery({
+    queryKey: ['adminUsers', userPage, debouncedUserSearch, userRoleFilter, userActiveFilter],
+    queryFn: () => api.adminGetUsers(userPage, perpage_value, debouncedUserSearch, userRoleFilter, userActiveFilter),
+    enabled: activeTab === 'users',
+  });
+
+  // Paginated Predictions list states
+  const [totalPredictions, setTotalPredictions] = useState(0);
+  const [predPage, setPredPage] = useState(1);
+  const [predSearch, setPredSearch] = useState('');
+  const [debouncedPredSearch, setDebouncedPredSearch] = useState('');
+  const [predStatusFilter, setPredStatusFilter] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPredSearch(predSearch);
+      setPredPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [predSearch]);
+
+  const { data: paginatedPredictionsData, isLoading: isPredictionsLoading, refetch: refetchPredictions } = useQuery({
+    queryKey: ['adminPredictions', predPage, debouncedPredSearch, predStatusFilter],
+    queryFn: () => api.adminGetPredictions(predPage, perpage_value, debouncedPredSearch, predStatusFilter),
+    enabled: activeTab === 'predictions',
+  });
+
+  // Paginated Teams list states
+  const [teamPage, setTeamPage] = useState(1);
+  const [teamSearch, setTeamSearch] = useState('');
+  const [debouncedTeamSearch, setDebouncedTeamSearch] = useState('');
+  const [teamActiveFilter, setTeamActiveFilter] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTeamSearch(teamSearch);
+      setTeamPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [teamSearch]);
+
+  const { data: paginatedTeamsData, isLoading: isTeamsLoading, refetch: refetchTeams } = useQuery({
+    queryKey: ['adminTeams', teamPage, debouncedTeamSearch, teamActiveFilter],
+    queryFn: () => api.adminGetTeams(teamPage, perpage_value, debouncedTeamSearch, teamActiveFilter),
+    enabled: activeTab === 'teams',
+  });
+
+  // Paginated Matches list states
+  const [matchPage, setMatchPage] = useState(1);
+  const [matchSearch, setMatchSearch] = useState('');
+  const [debouncedMatchSearch, setDebouncedMatchSearch] = useState('');
+  const [matchStatusFilter, setMatchStatusFilter] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedMatchSearch(matchSearch);
+      setMatchPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [matchSearch]);
+
+  const { data: paginatedMatchesData, isLoading: isMatchesLoading, refetch: refetchMatches } = useQuery({
+    queryKey: ['adminMatches', matchPage, debouncedMatchSearch, matchStatusFilter],
+    queryFn: () => api.adminGetMatches(matchPage, perpage_value, debouncedMatchSearch, matchStatusFilter),
+    enabled: activeTab === 'matches',
+  });
+
+  // Dashboard Stats query
+  const { data: dashboardStatsData, isLoading: isDashboardStatsLoading, refetch: refetchDashboardStats } = useQuery({
+    queryKey: ['adminDashboardStats'],
+    queryFn: () => api.adminGetDashboardStats(),
+    enabled: activeTab === 'dashboard',
+  });
 
   // Add Team Form States
   const [teamName, setTeamName] = useState('');
@@ -92,7 +192,6 @@ const Admin: React.FC = () => {
   const [editingMatch, setEditingMatch] = useState<any | null>(null);
   const [matchStatus, setMatchStatus] = useState('upcoming');
 
-  // Add User Form States
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
@@ -142,29 +241,9 @@ const Admin: React.FC = () => {
   const fetchTabEntries = async () => {
     try {
       setLoading(true);
-      if (activeTab === 'dashboard') {
-        const t = await api.adminGetTeams();
-        const m = await api.adminGetMatches();
-        const u = await api.adminGetUsers();
-        const p = await api.adminGetPredictions();
-        setTeamsList(t);
-        setMatchesList(m);
-        setUsersList(u);
-        setPredictionsList(p);
-      } else if (activeTab === 'teams') {
-        const t = await api.adminGetTeams();
-        setTeamsList(t);
-      } else if (activeTab === 'matches') {
-        const m = await api.adminGetMatches();
-        const t = await api.adminGetTeams();
-        setMatchesList(m);
-        setTeamsList(t);
-      } else if (activeTab === 'users') {
-        const u = await api.adminGetUsers();
-        setUsersList(u);
-      } else if (activeTab === 'predictions') {
-        const p = await api.adminGetPredictions();
-        setPredictionsList(p);
+      if (activeTab === 'matches') {
+        const t = await api.adminGetTeams(1, 1000, '', true);
+        setTeamsList(t.teams);
       }
     } catch (err: any) {
       toast({
@@ -199,7 +278,8 @@ const Admin: React.FC = () => {
       setTeamShortName('');
       setTeamLogo('');
       setEditingTeam(null);
-      fetchTabEntries();
+      refetchTeams();
+      refetchDashboardStats();
     } catch (err: any) {
       toast({ title: editingTeam ? "Update Team Failed" : "Create Team Failed", description: err.message || "Could not save team.", variant: "destructive" });
     }
@@ -239,7 +319,8 @@ const Admin: React.FC = () => {
       setMatchCloseTime('');
       setMatchStatus('upcoming');
       setEditingMatch(null);
-      fetchTabEntries();
+      refetchMatches();
+      refetchDashboardStats();
     } catch (err: any) {
       toast({ title: editingMatch ? "Update Match Failed" : "Create Match Failed", description: err.message || "Could not save match.", variant: "destructive" });
     }
@@ -274,7 +355,8 @@ const Admin: React.FC = () => {
       setNewUserPassword('');
       setNewUserRole('user');
       setEditingUser(null);
-      fetchTabEntries();
+      refetchUsers();
+      refetchDashboardStats();
     } catch (err: any) {
       toast({ title: editingUser ? "Update User Failed" : "Create User Failed", description: err.message || "Could not add user.", variant: "destructive" });
     }
@@ -298,7 +380,8 @@ const Admin: React.FC = () => {
       setWinnerDialogOpen(false);
       setSelectedMatchForWinner(null);
       setWinningTeamSelection('');
-      fetchTabEntries();
+      refetchMatches();
+      refetchDashboardStats();
     } catch (err: any) {
       toast({ title: "Action Failed", description: err.message || "Could not save match result.", variant: "destructive" });
     }
@@ -318,7 +401,8 @@ const Admin: React.FC = () => {
     try {
       await api.adminDeleteTeam(id);
       toast({ title: "Team Deleted", description: "Successfully removed team." });
-      fetchTabEntries();
+      refetchTeams();
+      refetchDashboardStats();
     } catch (err: any) {
       toast({ title: "Delete Failed", description: err.message || "Could not delete team.", variant: "destructive" });
     }
@@ -329,7 +413,8 @@ const Admin: React.FC = () => {
     try {
       await api.adminDeleteMatch(id);
       toast({ title: "Match Deleted", description: "Successfully removed match." });
-      fetchTabEntries();
+      refetchMatches();
+      refetchDashboardStats();
     } catch (err: any) {
       toast({ title: "Delete Failed", description: err.message || "Could not delete match.", variant: "destructive" });
     }
@@ -340,7 +425,8 @@ const Admin: React.FC = () => {
     try {
       await api.adminDeleteUser(id);
       toast({ title: "User Deleted", description: "Successfully removed user." });
-      fetchTabEntries();
+      refetchUsers();
+      refetchDashboardStats();
     } catch (err: any) {
       toast({ title: "Delete Failed", description: err.message || "Could not delete user.", variant: "destructive" });
     }
@@ -351,7 +437,8 @@ const Admin: React.FC = () => {
     try {
       await api.adminDeletePrediction(id);
       toast({ title: "Prediction Deleted", description: "Successfully removed prediction." });
-      fetchTabEntries();
+      refetchPredictions();
+      refetchDashboardStats();
     } catch (err: any) {
       toast({ title: "Delete Failed", description: err.message || "Could not delete prediction.", variant: "destructive" });
     }
@@ -359,10 +446,10 @@ const Admin: React.FC = () => {
 
 
   const stats = [
-    { label: 'Total Users', value: String(usersList.length), icon: Users, color: 'from-green-500 to-emerald-500', change: 'Live' },
-    { label: 'Total Teams', value: String(teamsList.length), icon: Trophy, color: 'from-blue-500 to-cyan-500', change: 'Live' },
-    { label: 'Active Matches', value: String(matchesList.filter(m => m.status !== 'completed').length), icon: Calendar, color: 'from-orange-500 to-amber-500', change: 'Live' },
-    { label: 'Predictions', value: String(predictionsList.length), icon: TrendingUp, color: 'from-purple-500 to-pink-500', change: 'Live' },
+    { label: 'Total Users', value: String(dashboardStatsData?.total_users ?? 0), icon: Users, color: 'from-green-500 to-emerald-500', change: 'Live' },
+    { label: 'Total Teams', value: String(dashboardStatsData?.total_teams ?? 0), icon: Trophy, color: 'from-blue-500 to-cyan-500', change: 'Live' },
+    { label: 'Active Matches', value: String(dashboardStatsData?.active_matches ?? 0), icon: Calendar, color: 'from-orange-500 to-amber-500', change: 'Live' },
+    { label: 'Predictions', value: String(dashboardStatsData?.total_predictions ?? 0), icon: TrendingUp, color: 'from-purple-500 to-pink-500', change: 'Live' },
   ];
 
   const sidebarItems: { id: TabType; label: string; icon: React.ElementType }[] = [
@@ -373,102 +460,106 @@ const Admin: React.FC = () => {
     { id: 'predictions', label: 'Predictions', icon: TrendingUp },
   ];
 
-  const renderDashboard = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-white">System Administration</h2>
-        <Button
-          onClick={handleRecalculateLeaderboard}
-          className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" /> Recalculate Leaderboard
-        </Button>
-      </div>
+  const renderDashboard = () => {
+    const recentPredictions = dashboardStatsData?.recent_predictions || [];
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, idx) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold text-white">System Administration</h2>
+          <Button
+            onClick={handleRecalculateLeaderboard}
+            className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold flex items-center gap-2"
           >
-            <Card className="glass-card p-6 relative overflow-hidden group">
-              <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${stat.color}`} />
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">{stat.label}</p>
-                  <p className="text-3xl font-bold text-white">{stat.value}</p>
-                  <Badge variant="secondary" className="mt-2 bg-green-500/10 text-green-400">
-                    {stat.change}
-                  </Badge>
-                </div>
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center opacity-80`}>
-                  <stat.icon className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
+            <RefreshCw className="w-4 h-4" /> Recalculate Leaderboard
+          </Button>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="glass-card p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-green-400" />
-            Recent Activity
-          </h3>
-          <div className="space-y-3">
-            {predictionsList.slice(0, 5).map((activity, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                className="flex items-center justify-between p-3 rounded-lg bg-white/5"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-xs font-bold">
-                    U
-                  </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, idx) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1 }}
+            >
+              <Card className="glass-card p-6 relative overflow-hidden group">
+                <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${stat.color}`} />
+                <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-gray-200">
-                      <span className="font-medium">User {activity.user_id.slice(-6)}</span> predicted {activity.match?.team1?.short_name || 'Home'} vs {activity.match?.team2?.short_name || 'Away'}
-                    </p>
-                    <p className="text-xs text-gray-500">{formatToIST(activity.submitted_at)}</p>
+                    <p className="text-sm text-gray-400 mb-1">{stat.label}</p>
+                    <p className="text-3xl font-bold text-white">{stat.value}</p>
+                    <Badge variant="secondary" className="mt-2 bg-green-500/10 text-green-400">
+                      {stat.change}
+                    </Badge>
+                  </div>
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center opacity-80`}>
+                    <stat.icon className="w-6 h-6 text-white" />
                   </div>
                 </div>
-              </motion.div>
-            ))}
-            {predictionsList.length === 0 && (
-              <p className="text-gray-500 text-sm">No recent prediction activity.</p>
-            )}
-          </div>
-        </Card>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
 
-        <Card className="glass-card p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-blue-400" />
-            System Status
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-400">Total Selections Submitted</span>
-                <span className="text-green-400">{predictionsList.length}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="glass-card p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-green-400" />
+              Recent Activity
+            </h3>
+            <div className="space-y-3">
+              {recentPredictions.map((activity: any, idx: number) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="flex items-center justify-between p-3 rounded-lg bg-white/5"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white">
+                      {activity.user_name?.charAt(0) || 'U'}
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-200">
+                        <span className="font-medium">{activity.user_name || `User ${activity.user_id.slice(-6)}`}</span> predicted {activity.match?.team1?.short_name || 'Home'} vs {activity.match?.team2?.short_name || 'Away'}
+                      </p>
+                      <p className="text-xs text-gray-500">{formatToIST(activity.submitted_at)}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+              {recentPredictions.length === 0 && (
+                <p className="text-gray-500 text-sm">No recent prediction activity.</p>
+              )}
+            </div>
+          </Card>
+
+          <Card className="glass-card p-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-blue-400" />
+              System Status
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-400">Total Selections Submitted</span>
+                  <span className="text-green-400">{dashboardStatsData?.total_predictions ?? 0}</span>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-400">Registered Teams</span>
+                  <span className="text-blue-400">{dashboardStatsData?.total_teams ?? 0} / 32</span>
+                </div>
               </div>
             </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-400">Registered Teams</span>
-                <span className="text-blue-400">{teamsList.length} / 32</span>
-              </div>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderDataTable = (
     columns: { key: string; label: string; render?: (value: Record<string, unknown>, row: Record<string, unknown>) => React.ReactNode }[],
@@ -632,25 +723,11 @@ const Admin: React.FC = () => {
   );
 
   const renderTeams = () => {
-    const columns = [
-      {
-        key: 'name', label: 'Team', render: (value: any, row: any) => (
-          <div className="flex items-center gap-3">
-            <img src={row.logo_url || ''} alt="" className="w-8 h-8 object-contain bg-white/5 rounded p-1" />
-            <span className="font-medium text-white">{value}</span>
-          </div>
-        )
-      },
-      { key: 'short_name', label: 'Short Name' },
-      {
-        key: 'active', label: 'Active', render: (value: any) => (
-          <Badge className={value ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}>
-            {value ? 'Active' : 'Inactive'}
-          </Badge>
-        )
-      },
-      { key: 'created_at', label: 'Created At', render: (value: any) => formatToIST(value) },
-    ];
+    const teams = paginatedTeamsData?.teams || [];
+    const total = paginatedTeamsData?.total || 0;
+    const pages = paginatedTeamsData?.pages || 0;
+    const startIdx = total === 0 ? 0 : (teamPage - 1) * perpage_value + 1;
+    const endIdx = Math.min(teamPage * perpage_value, total);
 
     return (
       <div className="space-y-6">
@@ -658,11 +735,11 @@ const Admin: React.FC = () => {
           <h2 className="text-xl font-semibold text-white">Teams Management</h2>
           <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-green-600 to-emerald-500">
+              <Button className="bg-gradient-to-r from-green-600 to-emerald-500 neon-glow">
                 <Plus className="w-4 h-4 mr-2" /> Add Team
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-gray-900 border-white/10">
+            <DialogContent className="bg-gray-900 border-white/10 text-white rounded-2xl max-w-md">
               <DialogHeader>
                 <DialogTitle className="text-white">{editingTeam ? 'Edit Team' : 'Add New Team'}</DialogTitle>
               </DialogHeader>
@@ -673,7 +750,7 @@ const Admin: React.FC = () => {
                     placeholder="Real Madrid"
                     value={teamName}
                     onChange={e => setTeamName(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                   />
                 </div>
                 <div className="space-y-2">
@@ -682,7 +759,7 @@ const Admin: React.FC = () => {
                     placeholder="RMA"
                     value={teamShortName}
                     onChange={e => setTeamShortName(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                   />
                 </div>
                 <div className="space-y-2">
@@ -691,75 +768,189 @@ const Admin: React.FC = () => {
                     placeholder="https://upload.wikimedia.org/...logo.png"
                     value={teamLogo}
                     onChange={e => setTeamLogo(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                   />
                 </div>
-                <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-500" onClick={handleCreateTeam}>
+                <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-500 neon-glow py-6 text-white font-bold rounded-xl mt-2" onClick={handleCreateTeam}>
                   {editingTeam ? 'Update Team' : 'Save Team'}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
-        {renderDataTable(columns, teamsList)}
+
+        <Card className="glass-card overflow-hidden">
+          <div className="p-4 border-b border-white/10 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            <div className="relative flex-1 w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search teams by name..."
+                value={teamSearch}
+                onChange={(e) => setTeamSearch(e.target.value)}
+                className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+              />
+            </div>
+            <div className="flex flex-wrap gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Status:</span>
+                <select
+                  value={teamActiveFilter === null ? "" : String(teamActiveFilter)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTeamActiveFilter(val === "" ? null : val === "true");
+                    setTeamPage(1);
+                  }}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-300 outline-none hover:bg-white/10 cursor-pointer"
+                >
+                  <option value="" className="bg-gray-900">All</option>
+                  <option value="true" className="bg-gray-900">Active</option>
+                  <option value="false" className="bg-gray-900">Inactive</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-white/5">
+                <tr>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Team</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Short Name</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Status</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Created At</th>
+                  <th className="text-right p-4 text-sm font-medium text-gray-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {isTeamsLoading ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin text-green-400" />
+                        Loading teams...
+                      </div>
+                    </td>
+                  </tr>
+                ) : teams.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-gray-500">
+                      No teams found.
+                    </td>
+                  </tr>
+                ) : (
+                  teams.map((row: any, idx: number) => (
+                    <motion.tr
+                      key={row.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: idx * 0.02 }}
+                      className="hover:bg-white/5 transition-colors"
+                    >
+                      <td className="p-4 text-sm text-gray-300">
+                        <div className="flex items-center gap-3">
+                          <img src={row.logo_url || ''} alt="" className="w-8 h-8 object-contain bg-white/5 rounded p-1" />
+                          <span className="font-medium text-white">{row.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm text-gray-300">{row.short_name}</td>
+                      <td className="p-4 text-sm text-gray-300">
+                        <Badge className={row.active ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-500/20 text-gray-400 border border-white/10'}>
+                          {row.active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-sm text-gray-400">{formatToIST(row.created_at)}</td>
+                      <td className="p-4 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-gray-900 border-white/10">
+                            <DropdownMenuItem
+                              className="text-blue-400 focus:bg-blue-500/10 focus:text-blue-400"
+                              onClick={() => {
+                                setEditingTeam(row);
+                                setTeamName(row.name);
+                                setTeamShortName(row.short_name);
+                                setTeamLogo(row.logo_url);
+                                setTeamDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="w-3.5 h-3.5 mr-2" /> Edit Team
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-400 focus:bg-red-500/10 focus:text-red-400"
+                              onClick={() => handleDeleteTeam(row.id)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete Team
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </motion.tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls Bar */}
+          {pages > 1 && (
+            <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <span className="text-xs text-gray-400">
+                Showing <span className="font-semibold text-white">{startIdx}</span> to{" "}
+                <span className="font-semibold text-white">{endIdx}</span> of{" "}
+                <span className="font-semibold text-white">{total}</span> teams
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTeamPage(prev => Math.max(prev - 1, 1))}
+                  disabled={teamPage === 1}
+                  className="border-white/10 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </Button>
+                {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                  <Button
+                    key={p}
+                    variant={teamPage === p ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setTeamPage(p)}
+                    className={
+                      teamPage === p
+                        ? "bg-green-600 hover:bg-green-700 text-white font-bold"
+                        : "border-white/10 text-gray-300"
+                    }
+                  >
+                    {p}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTeamPage(prev => Math.min(prev + 1, pages))}
+                  disabled={teamPage === pages}
+                  className="border-white/10 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
       </div>
     );
   };
 
   const renderMatches = () => {
-    console.log('Rendering matches with teamsList:', teamsList);
-    const columns = [
-      {
-        key: 'team1',
-        label: 'Match',
-        render: (_team: any, row: any) => (
-          <div className="flex items-center gap-3">
-            <img
-              src={row.team1?.logo_url || ''}
-              alt={row.team1?.name || ''}
-              className="w-6 h-6 object-contain bg-white/5 rounded p-0.5"
-            />
-
-            <span className="text-white font-medium">
-              {row.team1?.short_name || 'HOME'}
-            </span>
-
-            <span className="text-gray-400">vs</span>
-
-            <img
-              src={row.team2?.logo_url || ''}
-              alt={row.team2?.name || ''}
-              className="w-6 h-6 object-contain bg-white/5 rounded p-0.5"
-            />
-
-            <span className="text-white font-medium">
-              {row.team2?.short_name || 'AWAY'}
-            </span>
-          </div>
-        ),
-      },
-      { key: 'match_date', label: 'Kickoff Time', render: (value: any) => formatToIST(value) },
-      { key: 'prediction_open_time', label: 'Prediction Open', render: (value: any) => formatToIST(value) },
-      { key: 'prediction_close_time', label: 'Prediction Close', render: (value: any) => formatToIST(value) },
-      {
-        key: 'status', label: 'Status', render: (value: any) => (
-          <Badge className={`${value === 'completed' ? 'bg-green-500/20 text-green-400' :
-            value === 'live' ? 'bg-red-500/20 text-red-400' :
-              'bg-blue-500/20 text-blue-400'
-            }`}>
-            {value}
-          </Badge>
-        )
-      },
-      {
-        key: 'winning_team_id', label: 'Winner ID', render: (value: any, row: any) => {
-          if (!value) return 'Draw / TBD';
-          if (value === row.team1_id) return row.team1?.name;
-          if (value === row.team2_id) return row.team2?.name;
-          return value;
-        }
-      }
-    ];
+    const matches = paginatedMatchesData?.matches || [];
+    const total = paginatedMatchesData?.total || 0;
+    const pages = paginatedMatchesData?.pages || 0;
+    const startIdx = total === 0 ? 0 : (matchPage - 1) * perpage_value + 1;
+    const endIdx = Math.min(matchPage * perpage_value, total);
 
     return (
       <div className="space-y-6">
@@ -767,11 +958,11 @@ const Admin: React.FC = () => {
           <h2 className="text-xl font-semibold text-white">Matches Management</h2>
           <Dialog open={matchDialogOpen} onOpenChange={setMatchDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-green-600 to-emerald-500">
+              <Button className="bg-gradient-to-r from-green-600 to-emerald-500 neon-glow">
                 <Plus className="w-4 h-4 mr-2" /> Add Match
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-gray-900 border-white/10">
+            <DialogContent className="bg-gray-900 border-white/10 text-white rounded-2xl max-w-md">
               <DialogHeader>
                 <DialogTitle className="text-white">{editingMatch ? 'Edit Match' : 'Schedule New Match'}</DialogTitle>
               </DialogHeader>
@@ -782,7 +973,7 @@ const Admin: React.FC = () => {
                     <select
                       value={matchTeam1}
                       onChange={e => setMatchTeam1(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded p-2 text-white"
+                      className="w-full bg-slate-800 border border-white/10 rounded-xl p-3 text-white focus:border-green-500/50 outline-none cursor-pointer"
                     >
                       <option value="" className="bg-gray-900 text-white">Select Team...</option>
                       {teamsList.map(t => (
@@ -795,7 +986,7 @@ const Admin: React.FC = () => {
                     <select
                       value={matchTeam2}
                       onChange={e => setMatchTeam2(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded p-2 text-white"
+                      className="w-full bg-slate-800 border border-white/10 rounded-xl p-3 text-white focus:border-green-500/50 outline-none cursor-pointer"
                     >
                       <option value="" className="bg-gray-900 text-white">Select Team...</option>
                       {teamsList.map(t => (
@@ -810,7 +1001,7 @@ const Admin: React.FC = () => {
                     type="datetime-local"
                     value={matchDate}
                     onChange={e => setMatchDate(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -820,7 +1011,7 @@ const Admin: React.FC = () => {
                       type="datetime-local"
                       value={matchOpenTime}
                       onChange={e => setMatchOpenTime(e.target.value)}
-                      className="bg-white/5 border-white/10 text-white"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                     />
                   </div>
                   <div className="space-y-2">
@@ -829,7 +1020,7 @@ const Admin: React.FC = () => {
                       type="datetime-local"
                       value={matchCloseTime}
                       onChange={e => setMatchCloseTime(e.target.value)}
-                      className="bg-white/5 border-white/10 text-white"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                     />
                   </div>
                 </div>
@@ -839,7 +1030,7 @@ const Admin: React.FC = () => {
                     <select
                       value={matchStatus}
                       onChange={e => setMatchStatus(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded p-2 text-white"
+                      className="w-full bg-slate-800 border border-white/10 rounded-xl p-3 text-white focus:border-green-500/50 outline-none cursor-pointer"
                     >
                       <option value="upcoming" className="bg-gray-900 text-white">Upcoming</option>
                       <option value="live" className="bg-gray-900 text-white">Live</option>
@@ -847,14 +1038,222 @@ const Admin: React.FC = () => {
                     </select>
                   </div>
                 )}
-                <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-500" onClick={handleCreateMatch}>
+                <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-500 neon-glow py-6 text-white font-bold rounded-xl mt-2" onClick={handleCreateMatch}>
                   {editingMatch ? 'Update Match' : 'Schedule Match'}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
-        {renderDataTable(columns, matchesList)}
+
+        <Card className="glass-card overflow-hidden">
+          <div className="p-4 border-b border-white/10 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            <div className="relative flex-1 w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search matches by team names..."
+                value={matchSearch}
+                onChange={(e) => setMatchSearch(e.target.value)}
+                className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+              />
+            </div>
+            <div className="flex flex-wrap gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Status:</span>
+                <select
+                  value={matchStatusFilter}
+                  onChange={(e) => {
+                    setMatchStatusFilter(e.target.value);
+                    setMatchPage(1);
+                  }}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-300 outline-none hover:bg-white/10 cursor-pointer"
+                >
+                  <option value="" className="bg-gray-900">All</option>
+                  <option value="upcoming" className="bg-gray-900">Upcoming</option>
+                  <option value="live" className="bg-gray-900">Live</option>
+                  <option value="completed" className="bg-gray-900">Completed</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-white/5">
+                <tr>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Match</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Kickoff Time</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Prediction Open</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Prediction Close</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Status</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Winner</th>
+                  <th className="text-right p-4 text-sm font-medium text-gray-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {isMatchesLoading ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin text-green-400" />
+                        Loading matches...
+                      </div>
+                    </td>
+                  </tr>
+                ) : matches.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-gray-500">
+                      No matches scheduled.
+                    </td>
+                  </tr>
+                ) : (
+                  matches.map((row: any, idx: number) => {
+                    const homeTeamShort = row.team1?.short_name || 'HOME';
+                    const awayTeamShort = row.team2?.short_name || 'AWAY';
+                    const homeTeamLogo = row.team1?.logo_url;
+                    const awayTeamLogo = row.team2?.logo_url;
+
+                    let winnerName = 'Draw / TBD';
+                    if (row.winning_team_id) {
+                      if (row.winning_team_id === row.team1_id) {
+                        winnerName = row.team1?.name || 'Home';
+                      } else if (row.winning_team_id === row.team2_id) {
+                        winnerName = row.team2?.name || 'Away';
+                      }
+                    }
+
+                    return (
+                      <motion.tr
+                        key={row.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: idx * 0.02 }}
+                        className="hover:bg-white/5 transition-colors"
+                      >
+                        <td className="p-4 text-sm text-gray-300">
+                          <div className="flex items-center gap-2">
+                            {homeTeamLogo && <img src={homeTeamLogo} alt="" className="w-6 h-6 object-contain bg-white/5 rounded p-0.5" />}
+                            <span className="font-medium text-white">{homeTeamShort}</span>
+                            <span className="text-gray-500">vs</span>
+                            <span className="font-medium text-white">{awayTeamShort}</span>
+                            {awayTeamLogo && <img src={awayTeamLogo} alt="" className="w-6 h-6 object-contain bg-white/5 rounded p-0.5" />}
+                          </div>
+                        </td>
+                        <td className="p-4 text-sm text-gray-300">{formatToIST(row.match_date)}</td>
+                        <td className="p-4 text-sm text-gray-300">{formatToIST(row.prediction_open_time)}</td>
+                        <td className="p-4 text-sm text-gray-300">{formatToIST(row.prediction_close_time)}</td>
+                        <td className="p-4 text-sm text-gray-300">
+                          <Badge className={`${
+                            row.status === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                            row.status === 'live' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                            'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          }`}>
+                            {row.status}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-sm text-gray-300">
+                          <Badge variant="secondary" className="bg-white/5 text-gray-300 border border-white/10">
+                            {winnerName}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-gray-900 border-white/10">
+                              {(row.status === 'upcoming' || row.status === 'live') && (
+                                <DropdownMenuItem
+                                  className="text-green-400 focus:bg-green-500/10 focus:text-green-400"
+                                  onClick={() => {
+                                    setSelectedMatchForWinner(row);
+                                    setWinningTeamSelection('');
+                                    setWinnerDialogOpen(true);
+                                  }}
+                                >
+                                  <Trophy className="w-3.5 h-3.5 mr-2" /> Declare Winner
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                className="text-blue-400 focus:bg-blue-500/10 focus:text-blue-400"
+                                onClick={() => {
+                                  setEditingMatch(row);
+                                  setMatchTeam1(row.team1_id);
+                                  setMatchTeam2(row.team2_id);
+                                  setMatchDate(formatDatetimeLocal(row.match_date));
+                                  setMatchOpenTime(formatDatetimeLocal(row.prediction_open_time));
+                                  setMatchCloseTime(formatDatetimeLocal(row.prediction_close_time));
+                                  setMatchStatus(row.status);
+                                  setMatchDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="w-3.5 h-3.5 mr-2" /> Edit Match
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-400 focus:bg-red-500/10 focus:text-red-400"
+                                onClick={() => handleDeleteMatch(row.id)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete Match
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </motion.tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls Bar */}
+          {pages > 1 && (
+            <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <span className="text-xs text-gray-400">
+                Showing <span className="font-semibold text-white">{startIdx}</span> to{" "}
+                <span className="font-semibold text-white">{endIdx}</span> of{" "}
+                <span className="font-semibold text-white">{total}</span> matches
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMatchPage(prev => Math.max(prev - 1, 1))}
+                  disabled={matchPage === 1}
+                  className="border-white/10 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </Button>
+                {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                  <Button
+                    key={p}
+                    variant={matchPage === p ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setMatchPage(p)}
+                    className={
+                      matchPage === p
+                        ? "bg-green-600 hover:bg-green-700 text-white font-bold"
+                        : "border-white/10 text-gray-300"
+                    }
+                  >
+                    {p}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMatchPage(prev => Math.min(prev + 1, pages))}
+                  disabled={matchPage === pages}
+                  className="border-white/10 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
       </div>
     );
   };
@@ -862,7 +1261,9 @@ const Admin: React.FC = () => {
   const renderUsers = () => {
     const columns = [
       {
-        key: 'name', label: 'User', render: (value: any, row: any) => (
+        key: 'name',
+        label: 'User',
+        render: (value: any, row: any) => (
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-sm font-bold text-white">
               {value?.charAt(0) || ''}
@@ -874,34 +1275,74 @@ const Admin: React.FC = () => {
           </div>
         )
       },
-      { key: 'password', label: 'Password' },
       {
-        key: 'role', label: 'Role', render: (value: any) => (
-          <Badge className={value === 'admin' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}>
+        key: 'password',
+        label: 'Password',
+        render: (value: any, row: any) => {
+          const isVisible = visiblePasswords[row.id];
+          return (
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm tracking-wider">
+                {isVisible ? String(value) : '••••••••'}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-white/5"
+                onClick={() => togglePasswordVisibility(row.id)}
+              >
+                {isVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </Button>
+            </div>
+          );
+        }
+      },
+      {
+        key: 'role',
+        label: 'Role',
+        render: (value: any) => (
+          <Badge className={value === 'admin' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}>
             {value}
           </Badge>
         )
       },
       {
-        key: 'active', label: 'Active', render: (value: any) => (
-          <Badge className={value ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
+        key: 'active',
+        label: 'Active',
+        render: (value: any) => (
+          <Badge className={value ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}>
             {value ? 'Active' : 'Suspended'}
           </Badge>
         )
       }
     ];
 
+    const users = paginatedUsersData?.users || [];
+    const total = paginatedUsersData?.total || 0;
+    const pages = paginatedUsersData?.pages || 0;
+    const startIdx = total === 0 ? 0 : (userPage - 1) * perpage_value + 1;
+    const endIdx = Math.min(userPage * perpage_value, total);
+
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">Users Management</h2>
-          <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
+          <Dialog open={userDialogOpen} onOpenChange={(open) => {
+            setUserDialogOpen(open);
+            if (!open) {
+              setEditingUser(null);
+              setNewUserName('');
+              setNewUserEmail('');
+              setNewUserPassword('');
+              setNewUserRole('user');
+            }
+          }}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-green-600 to-emerald-500">
+              <Button className="bg-gradient-to-r from-green-600 to-emerald-500 neon-glow">
                 <Plus className="w-4 h-4 mr-2" /> Add User
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-gray-900 border-white/10">
+            <DialogContent className="bg-gray-900 border-white/10 text-white rounded-2xl max-w-md">
               <DialogHeader>
                 <DialogTitle className="text-white">{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
               </DialogHeader>
@@ -912,7 +1353,7 @@ const Admin: React.FC = () => {
                     placeholder="John Doe"
                     value={newUserName}
                     onChange={e => setNewUserName(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                   />
                 </div>
                 <div className="space-y-2">
@@ -922,16 +1363,16 @@ const Admin: React.FC = () => {
                     placeholder="john@gmail.com"
                     value={newUserEmail}
                     onChange={e => setNewUserEmail(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300">Password</Label>
                   <Input
-                    placeholder="EMP001"
+                    placeholder="password123"
                     value={newUserPassword}
                     onChange={e => setNewUserPassword(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                   />
                 </div>
                 <div className="space-y-2">
@@ -939,79 +1380,404 @@ const Admin: React.FC = () => {
                   <select
                     value={newUserRole}
                     onChange={e => setNewUserRole(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded p-2 text-white"
+                    className="w-full bg-slate-800 border border-white/10 rounded-xl p-3 text-white focus:border-green-500/50 outline-none"
                   >
-                    <option value="user" className="bg-gray-900 text-white">User</option>
-                    <option value="admin" className="bg-gray-900 text-white">Admin</option>
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
                   </select>
                 </div>
-                <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-500" onClick={handleCreateUser}>
+                <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-500 neon-glow py-6 text-white font-bold rounded-xl mt-2" onClick={handleCreateUser}>
                   {editingUser ? 'Update User' : 'Create User'}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
-        {renderDataTable(columns, usersList)}
+
+        {/* Custom DataTable with Server Pagination, Search & Filters, and NO Export button */}
+        <Card className="glass-card overflow-hidden">
+          <div className="p-4 border-b border-white/10 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            <div className="relative flex-1 w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search by name or email..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+              />
+            </div>
+            <div className="flex flex-wrap gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Role:</span>
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => {
+                    setUserRoleFilter(e.target.value);
+                    setUserPage(1);
+                  }}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-300 outline-none hover:bg-white/10 cursor-pointer"
+                >
+                  <option value="" className="bg-gray-900">All</option>
+                  <option value="user" className="bg-gray-900">User</option>
+                  <option value="admin" className="bg-gray-900">Admin</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Status:</span>
+                <select
+                  value={userActiveFilter === null ? "" : String(userActiveFilter)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setUserActiveFilter(val === "" ? null : val === "true");
+                    setUserPage(1);
+                  }}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-300 outline-none hover:bg-white/10 cursor-pointer"
+                >
+                  <option value="" className="bg-gray-900">All</option>
+                  <option value="true" className="bg-gray-900">Active</option>
+                  <option value="false" className="bg-gray-900">Suspended</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-white/5">
+                <tr>
+                  {columns.map((col) => (
+                    <th key={col.key} className="text-left p-4 text-sm font-medium text-gray-400">
+                      {col.label}
+                    </th>
+                  ))}
+                  <th className="text-right p-4 text-sm font-medium text-gray-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {isUsersLoading ? (
+                  <tr>
+                    <td colSpan={columns.length + 1} className="p-8 text-center text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin text-green-400" />
+                        Loading users...
+                      </div>
+                    </td>
+                  </tr>
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length + 1} className="p-8 text-center text-gray-500">
+                      No users found.
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((row: any, idx: number) => (
+                    <motion.tr
+                      key={row.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: idx * 0.02 }}
+                      className="hover:bg-white/5 transition-colors"
+                    >
+                      {columns.map((col) => (
+                        <td key={col.key} className="p-4 text-sm text-gray-300">
+                          {col.render ? col.render(row[col.key], row) : String(row[col.key] ?? '')}
+                        </td>
+                      ))}
+                      <td className="p-4 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-gray-900 border-white/10">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingUser(row);
+                                setNewUserName(row.name);
+                                setNewUserEmail(row.email);
+                                setNewUserPassword(row.password);
+                                setNewUserRole(row.role);
+                                setUserDialogOpen(true);
+                              }}
+                              className="text-blue-400 focus:bg-blue-500/10 focus:text-blue-400"
+                            >
+                              <Edit className="w-3.5 h-3.5 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteUser(row.id)}
+                              className="text-red-400 focus:bg-red-500/10 focus:text-red-400"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </motion.tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls Bar */}
+          {pages > 1 && (
+            <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <span className="text-xs text-gray-400">
+                Showing <span className="font-semibold text-white">{startIdx}</span> to{" "}
+                <span className="font-semibold text-white">{endIdx}</span> of{" "}
+                <span className="font-semibold text-white">{total}</span> users
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setUserPage(prev => Math.max(prev - 1, 1))}
+                  disabled={userPage === 1}
+                  className="border-white/10 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </Button>
+                {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                  <Button
+                    key={p}
+                    variant={userPage === p ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setUserPage(p)}
+                    className={
+                      userPage === p
+                        ? "bg-green-600 hover:bg-green-700 text-white font-bold"
+                        : "border-white/10 text-gray-300"
+                    }
+                  >
+                    {p}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setUserPage(prev => Math.min(prev + 1, pages))}
+                  disabled={userPage === pages}
+                  className="border-white/10 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
       </div>
     );
   };
 
   const renderPredictions = () => {
-    const columns = [
-      { key: 'matchId', label: 'Match' },
-      { key: 'userName', label: 'User Name' },
-      { key: 'predictedWinner', label: 'Prediction' },
-      { key: 'points', label: 'Points' },
-      {
-        key: 'isCorrect', label: 'Result', render: (value: any) => {
-          if (value === null || value === undefined) return <Badge className="bg-gray-500/20 text-gray-400">TBD</Badge>;
-          return (
-            <Badge className={value ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
-              {value ? 'Correct' : 'Incorrect'}
-            </Badge>
-          );
-        }
-      },
-    ];
-
-    const mappedPredictions = predictionsList.map(p => {
-      debugger;
-      const homeTeamShort = p.match?.team1?.short_name || 'HOME';
-      const awayTeamShort = p.match?.team2?.short_name || 'AWAY';
-
-      let winnerName = 'Draw';
-      if (p.winning_team_id === p.match?.team1_id) {
-        winnerName = p.match?.team1?.name || 'Home';
-      } else if (p.winning_team_id === p.match?.team2_id) {
-        winnerName = p.match?.team2?.name || 'Away';
-      }
-      return {
-        id: p.id,
-        matchId: `${homeTeamShort} vs ${awayTeamShort}`,
-        userId: p.user_id,
-        userName: p.user_name || `User ${p.user_id.slice(-6)}`,
-        predictedWinner: winnerName,
-        points: p.is_correct ? 10 : 0,
-        isCorrect: p.is_correct
-      };
-    });
+    const predictions = paginatedPredictionsData?.predictions || [];
+    const total = paginatedPredictionsData?.total || 0;
+    const pages = paginatedPredictionsData?.pages || 0;
+    const startIdx = total === 0 ? 0 : (predPage - 1) * perpage_value + 1;
+    const endIdx = Math.min(predPage * perpage_value, total);
 
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold text-white">Predictions Management</h2>
-          <Button className="bg-gradient-to-r from-green-600 to-emerald-500">
-            <Download className="w-4 h-4 mr-2" /> Export CSV
-          </Button>
         </div>
-        {renderDataTable(columns, mappedPredictions)}
+
+        <Card className="glass-card overflow-hidden">
+          <div className="p-4 border-b border-white/10 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            <div className="relative flex-1 w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search by user or team names..."
+                value={predSearch}
+                onChange={(e) => setPredSearch(e.target.value)}
+                className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+              />
+            </div>
+            <div className="flex flex-wrap gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Status:</span>
+                <select
+                  value={predStatusFilter}
+                  onChange={(e) => {
+                    setPredStatusFilter(e.target.value);
+                    setPredPage(1);
+                  }}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-300 outline-none hover:bg-white/10 cursor-pointer"
+                >
+                  <option value="" className="bg-gray-900">All</option>
+                  <option value="correct" className="bg-gray-900">Correct</option>
+                  <option value="incorrect" className="bg-gray-900">Incorrect</option>
+                  <option value="pending" className="bg-gray-900">Pending</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-white/5">
+                <tr>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Match</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">User</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Prediction</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Points</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Result</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Submitted At</th>
+                  <th className="text-right p-4 text-sm font-medium text-gray-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {isPredictionsLoading ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin text-green-400" />
+                        Loading predictions...
+                      </div>
+                    </td>
+                  </tr>
+                ) : predictions.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-gray-500">
+                      No predictions found.
+                    </td>
+                  </tr>
+                ) : (
+                  predictions.map((p: any, idx: number) => {
+                    const homeTeamShort = p.match?.team1?.short_name || 'HOME';
+                    const awayTeamShort = p.match?.team2?.short_name || 'AWAY';
+                    const homeTeamLogo = p.match?.team1?.logo_url;
+                    const awayTeamLogo = p.match?.team2?.logo_url;
+
+                    let predictedWinner = 'Draw';
+                    if (p.winning_team_id === p.match?.team1_id) {
+                      predictedWinner = p.match?.team1?.name || 'Home';
+                    } else if (p.winning_team_id === p.match?.team2_id) {
+                      predictedWinner = p.match?.team2?.name || 'Away';
+                    }
+
+                    const points = p.is_correct === true ? 10 : 0;
+
+                    return (
+                      <motion.tr
+                        key={p.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: idx * 0.02 }}
+                        className="hover:bg-white/5 transition-colors"
+                      >
+                        <td className="p-4 text-sm text-gray-300">
+                          <div className="flex items-center gap-2">
+                            {homeTeamLogo && <img src={homeTeamLogo} alt="" className="w-5 h-5 object-contain" />}
+                            <span className="font-medium text-white">{homeTeamShort}</span>
+                            <span className="text-gray-500">vs</span>
+                            <span className="font-medium text-white">{awayTeamShort}</span>
+                            {awayTeamLogo && <img src={awayTeamLogo} alt="" className="w-5 h-5 object-contain" />}
+                          </div>
+                        </td>
+                        <td className="p-4 text-sm text-gray-300">
+                          <span className="font-medium text-white">{p.user_name || `User ${p.user_id.slice(-6)}`}</span>
+                        </td>
+                        <td className="p-4 text-sm text-gray-300">
+                          <Badge className="bg-white/5 text-gray-300 border border-white/10">
+                            {predictedWinner}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-sm text-gray-300">
+                          <span className={p.is_correct === true ? 'text-green-400 font-semibold' : 'text-gray-400'}>
+                            {p.is_correct === null || p.is_correct === undefined ? '-' : points}
+                          </span>
+                        </td>
+                        <td className="p-4 text-sm text-gray-300">
+                          {p.is_correct === null || p.is_correct === undefined ? (
+                            <Badge className="bg-gray-500/20 text-gray-400 border border-gray-500/30">TBD</Badge>
+                          ) : (
+                            <Badge className={p.is_correct ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}>
+                              {p.is_correct ? 'Correct' : 'Incorrect'}
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-4 text-sm text-gray-400">
+                          {formatToIST(p.submitted_at)}
+                        </td>
+                        <td className="p-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-gray-900 border-white/10">
+                              <DropdownMenuItem
+                                onClick={() => handleDeletePrediction(p.id)}
+                                className="text-red-400 focus:bg-red-500/10 focus:text-red-400"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </motion.tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls Bar */}
+          {pages > 1 && (
+            <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <span className="text-xs text-gray-400">
+                Showing <span className="font-semibold text-white">{startIdx}</span> to{" "}
+                <span className="font-semibold text-white">{endIdx}</span> of{" "}
+                <span className="font-semibold text-white">{total}</span> predictions
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPredPage(prev => Math.max(prev - 1, 1))}
+                  disabled={predPage === 1}
+                  className="border-white/10 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </Button>
+                {Array.from({ length: pages }, (_, i) => i + 1).map((pageNumber) => (
+                  <Button
+                    key={pageNumber}
+                    variant={predPage === pageNumber ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setPredPage(pageNumber)}
+                    className={
+                      predPage === pageNumber
+                        ? "bg-green-600 hover:bg-green-700 text-white font-bold"
+                        : "border-white/10 text-gray-300"
+                    }
+                  >
+                    {pageNumber}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPredPage(prev => Math.min(prev + 1, pages))}
+                  disabled={predPage === pages}
+                  className="border-white/10 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
       </div>
     );
   };
 
   const renderContent = () => {
-    if (loading) {
+    if (loading || (activeTab === 'dashboard' && isDashboardStatsLoading)) {
       return (
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex flex-col items-center gap-4">

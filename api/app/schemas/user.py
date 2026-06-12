@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field
 from app.schemas import ISTDateTime
 
@@ -32,3 +32,10 @@ class UserResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+class UserPaginatedResponse(BaseModel):
+    users: List[UserResponse]
+    total: int
+    page: int
+    limit: int
+    pages: int

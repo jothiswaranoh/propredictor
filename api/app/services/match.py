@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
+from bson import ObjectId
 from app.models.match import Match
 from app.repositories.match import MatchRepository
 from app.repositories.team import TeamRepository
@@ -133,3 +134,67 @@ class MatchService:
         }
         
         return await self.match_repo.update(match_id, update_dict)
+
+    async def get_paginated_matches_detailed(
+        self,
+        page: int = 1,
+        limit: int = 20,
+        search: Optional[str] = None,
+        status: Optional[str] = None
+    ) -> dict:
+        search_filter = None
+        if search:
+            matched_teams = await self.team_repo.get_all(filter_query={
+                "name": {"$regex": search, "$options": "i"}
+            })
+            team_ids = [t.id for t in matched_teams]
+            
+            if team_ids:
+                team_obj_ids = [self.team_repo._to_object_id(tid) for tid in team_ids]
+                search_filter = {
+                    "$or": [
+                        {"team1_id": {"$in": team_obj_ids}},
+                        {"team2_id": {"$in": team_obj_ids}}
+                    ]
+                }
+            else:
+                search_filter = {"_id": ObjectId()}
+                
+        status_filter = None
+        if status and status != "all":
+            status_filter = {"status": status}
+            
+        filter_query = {}
+        conditions = []
+        if search_filter:
+            conditions.append(search_filter)
+        if status_filter:
+            conditions.append(status_filter)
+            
+        if conditions:
+            if len(conditions) == 1:
+                filter_query = conditions[0]
+            else:
+                filter_query = {"$and": conditions}
+                
+        matches, total = await self.match_repo.get_paginated(
+            filter_query=filter_query,
+            sort_by="match_date",
+            descending=True,
+            page=page,
+            limit=limit
+        )
+        
+        detailed_matches = []
+        for m in matches:
+            detailed = await self.get_match_detail(m)
+            detailed_matches.append(detailed)
+            
+        pages = (total + limit - 1) // limit if limit > 0 else 0
+        return {
+            "matches": detailed_matches,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "pages": pages
+        }
