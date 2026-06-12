@@ -85,6 +85,20 @@ export const api = {
     return request<any>('/api/users/me');
   },
 
+  updateProfile(name: string) {
+    return request<any>('/api/users/me', {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  updatePassword(newPassword: string) {
+    return request<any>('/api/users/me/password', {
+      method: 'PUT',
+      body: JSON.stringify({ new_password: newPassword }),
+    });
+  },
+
   // User Matches & Predictions
   getMatches() {
     return request<any[]>('/api/matches');

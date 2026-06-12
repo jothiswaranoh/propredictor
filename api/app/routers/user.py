@@ -10,8 +10,16 @@ from app.dependencies import (
     get_match_service,
     get_prediction_service,
     get_leaderboard_service,
-    get_prediction_repo
+    get_prediction_repo,
+    get_user_repo
 )
+from pydantic import BaseModel, Field
+
+class PasswordUpdate(BaseModel):
+    new_password: str = Field(..., min_length=2, max_length=50)
+
+class ProfileUpdate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
 from app.services.match import MatchService
 from app.services.prediction import PredictionService
 from app.services.leaderboard import LeaderboardService
@@ -24,6 +32,30 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
     Get the authenticated user's profile information.
     """
     return current_user
+
+@router.put("/api/users/me", response_model=UserResponse)
+async def update_my_profile(
+    profile_data: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    user_repo = Depends(get_user_repo)
+):
+    """
+    Update the authenticated user's profile.
+    """
+    updated_user = await user_repo.update(str(current_user.id), {"name": profile_data.name})
+    return updated_user
+
+@router.put("/api/users/me/password", response_model=UserResponse)
+async def update_my_password(
+    password_data: PasswordUpdate,
+    current_user: User = Depends(get_current_user),
+    user_repo = Depends(get_user_repo)
+):
+    """
+    Update the authenticated user's password.
+    """
+    updated_user = await user_repo.update(str(current_user.id), {"password": password_data.new_password})
+    return updated_user
 
 @router.get("/api/matches", response_model=List[MatchDetailResponse])
 async def list_matches(
