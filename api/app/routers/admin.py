@@ -102,6 +102,8 @@ async def list_matches(
     limit: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    team_id: Optional[str] = Query(None),
+    date: Optional[str] = Query(None),
     match_service: MatchService = Depends(get_match_service)
 ):
     """
@@ -111,7 +113,9 @@ async def list_matches(
         page=page,
         limit=limit,
         search=search,
-        status=status
+        status=status,
+        team_id=team_id,
+        date=date
     )
 
 @router.get("/matches/{match_id}", response_model=MatchDetailResponse)

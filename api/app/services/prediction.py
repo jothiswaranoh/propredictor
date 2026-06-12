@@ -82,37 +82,44 @@ class PredictionService:
         return detailed_preds
 
     async def get_all_predictions_detailed(self, match_service) -> List[PredictionDetailResponse]:
+        import asyncio
         predictions = await self.prediction_repo.get_all(sort_by="submitted_at", descending=True)
-        user_cache = {}
-        detailed_preds = []
-        for p in predictions:
-            match = await self.match_repo.get_by_id(p.match_id)
+        if not predictions:
+            return []
+            
+        unique_match_ids = list({p.match_id for p in predictions})
+        unique_user_ids = list({p.user_id for p in predictions})
+        
+        matches_list, users_list = await asyncio.gather(
+            self.match_repo.get_all(filter_query={"_id": {"$in": [self.prediction_repo._to_object_id(mid) for mid in unique_match_ids]}}),
+            self.user_repo.get_all(filter_query={"_id": {"$in": [self.prediction_repo._to_object_id(uid) for uid in unique_user_ids]}})
+        )
+        
+        match_map = {str(m.id): m for m in matches_list}
+        user_map = {str(u.id): u.name for u in users_list}
+        
+        async def build_detail(p):
+            match = match_map.get(str(p.match_id))
             if not match:
-                continue
+                return None
             is_correct = None
             if match.status == "completed":
                 is_correct = (p.winning_team_id == match.winning_team_id)
             match_detail = await match_service.get_match_detail(match)
-            
-            uid = str(p.user_id)
-            if uid not in user_cache:
-                user = await self.user_repo.get_by_id(uid)
-                user_cache[uid] = user.name if user else "Unknown User"
-            user_name = user_cache[uid]
-
-            detailed_preds.append(
-                PredictionDetailResponse(
-                    id=str(p.id),
-                    user_id=str(p.user_id),
-                    user_name=user_name,
-                    match_id=str(p.match_id),
-                    winning_team_id=str(p.winning_team_id) if p.winning_team_id is not None else None,
-                    submitted_at=p.submitted_at,
-                    match=match_detail,
-                    is_correct=is_correct
-                )
+            user_name = user_map.get(str(p.user_id), "Unknown User")
+            return PredictionDetailResponse(
+                id=str(p.id),
+                user_id=str(p.user_id),
+                user_name=user_name,
+                match_id=str(p.match_id),
+                winning_team_id=str(p.winning_team_id) if p.winning_team_id is not None else None,
+                submitted_at=p.submitted_at,
+                match=match_detail,
+                is_correct=is_correct
             )
-        return detailed_preds
+            
+        details = await asyncio.gather(*(build_detail(p) for p in predictions))
+        return [d for d in details if d is not None]
 
     async def get_paginated_predictions_detailed(
         self,
@@ -213,38 +220,52 @@ class PredictionService:
             limit=limit
         )
 
-        user_cache = {}
-        detailed_preds = []
-        for p in predictions:
-            match = await self.match_repo.get_by_id(p.match_id)
+        import asyncio
+        if not predictions:
+            return {
+                "predictions": [],
+                "total": total,
+                "page": page,
+                "limit": limit,
+                "pages": 0
+            }
+            
+        unique_match_ids = list({p.match_id for p in predictions})
+        unique_user_ids = list({p.user_id for p in predictions})
+        
+        matches_list, users_list = await asyncio.gather(
+            self.match_repo.get_all(filter_query={"_id": {"$in": [self.prediction_repo._to_object_id(mid) for mid in unique_match_ids]}}),
+            self.user_repo.get_all(filter_query={"_id": {"$in": [self.prediction_repo._to_object_id(uid) for uid in unique_user_ids]}})
+        )
+        
+        match_map = {str(m.id): m for m in matches_list}
+        user_map = {str(u.id): u.name for u in users_list}
+        
+        async def build_detail(p):
+            match = match_map.get(str(p.match_id))
             if not match:
-                continue
+                return None
             is_correct = None
             if match.status == "completed":
                 is_correct = (p.winning_team_id == match.winning_team_id)
             match_detail = await match_service.get_match_detail(match)
-            
-            uid = str(p.user_id)
-            if uid not in user_cache:
-                user = await self.user_repo.get_by_id(uid)
-                user_cache[uid] = user.name if user else "Unknown User"
-            user_name = user_cache[uid]
-
-            detailed_preds.append(
-                PredictionDetailResponse(
-                    id=str(p.id),
-                    user_id=str(p.user_id),
-                    user_name=user_name,
-                    match_id=str(p.match_id),
-                    winning_team_id=str(p.winning_team_id) if p.winning_team_id is not None else None,
-                    submitted_at=p.submitted_at,
-                    match=match_detail,
-                    is_correct=is_correct
-                )
+            user_name = user_map.get(str(p.user_id), "Unknown User")
+            return PredictionDetailResponse(
+                id=str(p.id),
+                user_id=str(p.user_id),
+                user_name=user_name,
+                match_id=str(p.match_id),
+                winning_team_id=str(p.winning_team_id) if p.winning_team_id is not None else None,
+                submitted_at=p.submitted_at,
+                match=match_detail,
+                is_correct=is_correct
             )
-
+            
+        details = await asyncio.gather(*(build_detail(p) for p in predictions))
+        detailed_preds = [d for d in details if d is not None]
+        
         pages = (total + limit - 1) // limit if limit > 0 else 0
-
+        
         return {
             "predictions": detailed_preds,
             "total": total,
@@ -254,24 +275,31 @@ class PredictionService:
         }
 
     async def get_dashboard_stats(self, match_service) -> dict:
-        total_users = await self.user_repo.collection.count_documents({})
-        total_teams = await self.team_repo.collection.count_documents({})
-        active_matches = await self.match_repo.collection.count_documents({"status": {"$ne": "completed"}})
-        total_predictions = await self.prediction_repo.collection.count_documents({})
-        
-        recent_preds_dict = await self.get_paginated_predictions_detailed(
+        import asyncio
+        total_users_task = self.user_repo.collection.count_documents({})
+        total_teams_task = self.team_repo.collection.count_documents({})
+        active_matches_task = self.match_repo.collection.count_documents({"status": {"$ne": "completed"}})
+        total_predictions_task = self.prediction_repo.collection.count_documents({})
+        recent_preds_task = self.get_paginated_predictions_detailed(
             match_service=match_service,
             page=1,
             limit=5
         )
-        recent_predictions = recent_preds_dict["predictions"]
+        
+        total_users, total_teams, active_matches, total_predictions, recent_preds_dict = await asyncio.gather(
+            total_users_task,
+            total_teams_task,
+            active_matches_task,
+            total_predictions_task,
+            recent_preds_task
+        )
         
         return {
             "total_users": total_users,
             "total_teams": total_teams,
             "active_matches": active_matches,
             "total_predictions": total_predictions,
-            "recent_predictions": recent_predictions
+            "recent_predictions": recent_preds_dict["predictions"]
         }
 
     async def delete_prediction(self, prediction_id: str) -> bool:

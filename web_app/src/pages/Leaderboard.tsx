@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Trophy, TrendingUp, User, Crown, Search, ArrowUpDown } from 'lucide-react';
+import { ChevronLeft, Trophy, TrendingUp, Crown, Search, ArrowUpDown } from 'lucide-react';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';

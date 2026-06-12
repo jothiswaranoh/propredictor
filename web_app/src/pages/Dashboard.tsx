@@ -4,10 +4,9 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Trophy, Clock, Calendar, TrendingUp, ChevronRight,
-  LogOut, User, Target, Flame, Crown, ArrowUpRight, CheckCircle2, Eye, EyeOff
+  LogOut, User, Target, Flame, Crown, ArrowUpRight, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';

@@ -140,7 +140,9 @@ class MatchService:
         page: int = 1,
         limit: int = 20,
         search: Optional[str] = None,
-        status: Optional[str] = None
+        status: Optional[str] = None,
+        team_id: Optional[str] = None,
+        date: Optional[str] = None
     ) -> dict:
         search_filter = None
         if search:
@@ -163,6 +165,26 @@ class MatchService:
         status_filter = None
         if status and status != "all":
             status_filter = {"status": status}
+
+        team_filter = None
+        if team_id and team_id != "all":
+            team_filter = {
+                "$or": [
+                    {"team1_id": self.match_repo._to_object_id(team_id)},
+                    {"team2_id": self.match_repo._to_object_id(team_id)}
+                ]
+            }
+
+        date_filter = None
+        if date:
+            try:
+                from datetime import timedelta
+                parsed_date = datetime.strptime(date, "%Y-%m-%d")
+                utc_start = parsed_date - timedelta(hours=5, minutes=30)
+                utc_end = utc_start + timedelta(days=1) - timedelta(microseconds=1)
+                date_filter = {"match_date": {"$gte": utc_start, "$lte": utc_end}}
+            except Exception:
+                date_filter = None
             
         filter_query = {}
         conditions = []
@@ -170,6 +192,10 @@ class MatchService:
             conditions.append(search_filter)
         if status_filter:
             conditions.append(status_filter)
+        if team_filter:
+            conditions.append(team_filter)
+        if date_filter:
+            conditions.append(date_filter)
             
         if conditions:
             if len(conditions) == 1:

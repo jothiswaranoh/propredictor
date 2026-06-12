@@ -152,11 +152,12 @@ export const api = {
     });
   },
 
-  // Matches
-  adminGetMatches(page = 1, limit = 20, search = '', status = '') {
+  adminGetMatches(page = 1, limit = 20, search = '', status = '', teamId = '', date = '') {
     let url = `/api/admin/matches?page=${page}&limit=${limit}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (status) url += `&status=${encodeURIComponent(status)}`;
+    if (teamId) url += `&team_id=${encodeURIComponent(teamId)}`;
+    if (date) url += `&date=${encodeURIComponent(date)}`;
     return request<{ matches: any[]; total: number; page: number; limit: number; pages: number }>(url);
   },
 
