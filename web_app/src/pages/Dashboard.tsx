@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -95,71 +96,75 @@ const mapBackendLeaderboardToFrontend = (l: any): LeaderboardEntry => {
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [matchesList, setMatchesList] = useState<Match[]>([]);
+  const queryClient = useQueryClient();
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [prediction, setPrediction] = useState<'home' | 'away' | 'draw' | null>(null);
-  const [predHistory, setPredHistory] = useState<Prediction[]>([]);
-  const [leaderboardList, setLeaderboardList] = useState<LeaderboardEntry[]>([]);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [userProfile, setUserProfile] = useState<any>(null);
 
   // Prediction selection & Confirmation states
   const [pendingSelection, setPendingSelection] = useState<'home' | 'away' | 'draw' | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [submittingPrediction, setSubmittingPrediction] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const handleUpdateProfile = async (newName: string) => {
-    const updatedUser = await api.updateProfile(newName);
-    setUserProfile(updatedUser);
+  const { data: userProfile, isLoading: isProfileLoading } = useQuery({
+    queryKey: ['userProfile'],
+    queryFn: () => api.getCurrentUser(),
+  });
+
+  const { data: predHistory = [], isLoading: isHistoryLoading } = useQuery({
+    queryKey: ['predictionHistory'],
+    queryFn: async () => {
+      const rawHistory = await api.getPredictionHistory();
+      return rawHistory.map(mapBackendPredictionToFrontend);
+    }
+  });
+
+  const { data: matchesData, isLoading: isMatchesLoading } = useQuery({
+    queryKey: ['matches'],
+    queryFn: async () => {
+      const [rawActive, rawAll] = await Promise.all([
+        api.getActiveMatches(),
+        api.getMatches()
+      ]);
+      return {
+        activeMapped: rawActive.map(mapBackendMatchToFrontend),
+        allMapped: rawAll.map(mapBackendMatchToFrontend)
+      };
+    }
+  });
+
+  const matchesList = matchesData?.allMapped || [];
+
+  const { data: leaderboardList = [], isLoading: isLeaderboardLoading } = useQuery({
+    queryKey: ['leaderboardList'],
+    queryFn: async () => {
+      const rawLeaderboard = await api.getLeaderboard();
+      return rawLeaderboard.leaderboard.map(mapBackendLeaderboardToFrontend);
+    }
+  });
+
+  const loading = isProfileLoading || isHistoryLoading || isMatchesLoading || isLeaderboardLoading;
+
+  useEffect(() => {
+    if (!selectedMatch && matchesData) {
+      if (matchesData.activeMapped.length > 0) {
+        setSelectedMatch(matchesData.activeMapped[0]);
+      } else if (matchesData.allMapped.length > 0) {
+        setSelectedMatch(matchesData.allMapped[0]);
+      }
+    }
+  }, [matchesData, selectedMatch]);
+
+  const handleUpdateProfile = async (newName: string, avatar?: string) => {
+    const updatedUser = await api.updateProfile(newName, avatar);
+    queryClient.setQueryData(['userProfile'], updatedUser);
     localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   const handleResetPassword = async (newPassword: string) => {
     await api.updatePassword(newPassword);
   };
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        const profile = await api.getCurrentUser();
-        setUserProfile(profile);
-
-        const rawHistory = await api.getPredictionHistory();
-        const mappedHistory = rawHistory.map(mapBackendPredictionToFrontend);
-        setPredHistory(mappedHistory);
-
-        const rawActive = await api.getActiveMatches();
-        const activeMapped = rawActive.map(mapBackendMatchToFrontend);
-
-        const rawAll = await api.getMatches();
-        const allMapped = rawAll.map(mapBackendMatchToFrontend);
-        setMatchesList(allMapped);
-
-        const rawLeaderboard = await api.getLeaderboard();
-        setLeaderboardList(rawLeaderboard.leaderboard.map(mapBackendLeaderboardToFrontend));
-
-        if (activeMapped.length > 0) {
-          setSelectedMatch(activeMapped[0]);
-        } else if (allMapped.length > 0) {
-          setSelectedMatch(allMapped[0]);
-        }
-      } catch (err: any) {
-        toast({
-          title: "Error loading data",
-          description: err.message || "Failed to load dashboard data.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
 
   // Synchronize prediction and pendingSelection with selectedMatch
   useEffect(() => {
@@ -195,45 +200,47 @@ const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [selectedMatch]);
 
-  const handleConfirmPredict = async () => {
+  const submitPredictionMutation = useMutation({
+    mutationFn: async ({ matchId, teamId }: { matchId: string, teamId: string | null }) => {
+      await api.submitPrediction(matchId, teamId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['predictionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboardList'] });
+      
+      const isUpdate = prediction !== null;
+      setPrediction(pendingSelection);
+      toast({
+        title: isUpdate ? "Prediction Updated!" : "Prediction Recorded!",
+        description: `Your prediction has been set to ${pendingSelection === 'home'
+          ? selectedMatch?.homeTeam.shortName
+          : pendingSelection === 'away'
+            ? selectedMatch?.awayTeam.shortName
+            : 'Draw'
+          }.`,
+      });
+      setConfirmOpen(false);
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Prediction Failed",
+        description: err.message || "Failed to submit prediction.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const submittingPrediction = submitPredictionMutation.isPending;
+
+  const handleConfirmPredict = () => {
     if (!selectedMatch || !pendingSelection) return;
     const predictedTeamId = pendingSelection === 'draw'
       ? null
       : pendingSelection === 'home'
         ? selectedMatch.homeTeam.id
         : selectedMatch.awayTeam.id;
-    try {
-      setSubmittingPrediction(true);
-      await api.submitPrediction(selectedMatch.id, predictedTeamId);
-
-      const isUpdate = prediction !== null;
-      setPrediction(pendingSelection);
-      toast({
-        title: isUpdate ? "Prediction Updated!" : "Prediction Recorded!",
-        description: `Your prediction has been set to ${pendingSelection === 'home'
-          ? selectedMatch.homeTeam.shortName
-          : pendingSelection === 'away'
-            ? selectedMatch.awayTeam.shortName
-            : 'Draw'
-          }.`,
-      });
-
-      const rawHistory = await api.getPredictionHistory();
-      setPredHistory(rawHistory.map(mapBackendPredictionToFrontend));
-
-      const rawLeaderboard = await api.getLeaderboard();
-      setLeaderboardList(rawLeaderboard.leaderboard.map(mapBackendLeaderboardToFrontend));
-
-      setConfirmOpen(false);
-    } catch (err: any) {
-      toast({
-        title: "Prediction Failed",
-        description: err.message || "Failed to submit prediction.",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmittingPrediction(false);
-    }
+        
+    submitPredictionMutation.mutate({ matchId: selectedMatch.id, teamId: predictedTeamId });
   };
 
   const upcomingMatches = matchesList.filter(m => m.status === 'upcoming').slice(0, 3);
@@ -276,14 +283,26 @@ const Dashboard: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="hidden sm:flex items-center gap-3 glass-card px-4 py-2 rounded-full">
                   <Crown className="w-4 h-4 text-yellow-500" />
-                  <span className="text-sm font-medium">{userRank?.points || 0} pts</span>
+                  <span className="text-sm font-medium">{(userRank?.points || 0) * 10} pts</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div 
-                    className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-white/50 transition-all"
+                    className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden cursor-pointer hover:ring-2 hover:ring-white/50 transition-all border border-white/10 shrink-0"
                     onClick={() => setProfileOpen(true)}
                   >
-                    <User className="w-5 h-5 text-white" />
+                    {userProfile?.avatar ? (
+                      <img src={userProfile.avatar} alt={userProfile.name} className="w-full h-full object-cover" />
+                    ) : userProfile?.name ? (
+                      <img 
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userProfile.name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffdfbf,ffd5dc`}
+                        alt={userProfile.name}
+                        className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center">
+                        <User className="w-5 h-5 text-white" />
+                      </div>
+                    )}
                   </div>
                   <Button
                     variant="ghost"
@@ -567,7 +586,7 @@ const Dashboard: React.FC = () => {
                     <Flame className="w-4 h-4 text-orange-400" />
                     Prediction History
                   </h3>
-                  <Button variant="ghost" size="sm" className="text-xs text-gray-400">
+                  <Button variant="ghost" size="sm" className="text-xs text-gray-400" onClick={() => navigate('/predictions')}>
                     View All <ChevronRight className="w-3 h-3" />
                   </Button>
                 </div>
@@ -621,7 +640,7 @@ const Dashboard: React.FC = () => {
                     <TrendingUp className="w-4 h-4 text-blue-400" />
                     Leaderboard
                   </h3>
-                  <Button variant="ghost" size="sm" className="text-xs text-gray-400">
+                  <Button variant="ghost" size="sm" className="text-xs text-gray-400" onClick={() => navigate('/leaderboard')}>
                     Full Rankings <ArrowUpRight className="w-3 h-3" />
                   </Button>
                 </div>
