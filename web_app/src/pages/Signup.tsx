@@ -97,12 +97,12 @@ const Signup: React.FC = () => {
             >
               <Label htmlFor="email" className="text-gray-300 flex items-center gap-2">
                 <Mail className="w-4 h-4 text-green-400" />
-                Email
+                Email Address
               </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter Your Email"
+                placeholder="username@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50 focus:ring-green-500/20"
@@ -123,7 +123,7 @@ const Signup: React.FC = () => {
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your Password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20"

@@ -94,7 +94,7 @@ export const api = {
     return request<any[]>('/api/matches/active');
   },
 
-  submitPrediction(matchId: string, winningTeamId: string) {
+  submitPrediction(matchId: string, winningTeamId: string | null) {
     return request<any>(`/api/predictions/${matchId}`, {
       method: 'POST',
       body: JSON.stringify({ winning_team_id: winningTeamId }),

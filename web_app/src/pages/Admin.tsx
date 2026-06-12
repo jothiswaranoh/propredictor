@@ -916,10 +916,10 @@ const Admin: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-gray-300">Company Email</Label>
+                  <Label className="text-gray-300">Email Address</Label>
                   <Input
                     type="email"
-                    placeholder="john@company.com"
+                    placeholder="john@gmail.com"
                     value={newUserEmail}
                     onChange={e => setNewUserEmail(e.target.value)}
                     className="bg-white/5 border-white/10 text-white"

@@ -33,7 +33,7 @@ const Login: React.FC = () => {
     } catch (err: any) {
       toast({
         title: "Login Failed",
-        description: err.message || "Invalid company email or employee ID",
+        description: err.message || "Invalid email or password",
         variant: "destructive",
       });
     } finally {
@@ -85,7 +85,7 @@ const Login: React.FC = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter Your Email"
+                placeholder="username@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50 focus:ring-green-500/20"
