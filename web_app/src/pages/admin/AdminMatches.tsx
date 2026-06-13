@@ -85,6 +85,7 @@ const AdminMatches: React.FC = () => {
   const teamOptions = teamsList.map((t: any) => ({
     value: t.id,
     label: t.name,
+    logo_url: t.logo_url,
   }));
 
   const teamFilterOptions = [
@@ -269,14 +270,38 @@ const AdminMatches: React.FC = () => {
 
               {/* Selected teams preview */}
               {(matchTeam1 || matchTeam2) && (
-                <div className="flex items-center justify-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                  <span className="text-white font-medium text-sm">
-                    {teamOptions.find(t => t.value === matchTeam1)?.label || '—'}
-                  </span>
+                <div className="flex items-center justify-center gap-6 p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const t = teamOptions.find(o => o.value === matchTeam1);
+                      return (
+                        <>
+                          {t?.logo_url && (
+                            <img src={t.logo_url} alt="" className="w-8 h-8 object-contain bg-white/5 rounded p-0.5" />
+                          )}
+                          <span className="text-white font-medium text-sm">
+                            {t?.label || '—'}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
                   <span className="text-gray-500 text-xs font-bold">VS</span>
-                  <span className="text-white font-medium text-sm">
-                    {teamOptions.find(t => t.value === matchTeam2)?.label || '—'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const t = teamOptions.find(o => o.value === matchTeam2);
+                      return (
+                        <>
+                          <span className="text-white font-medium text-sm">
+                            {t?.label || '—'}
+                          </span>
+                          {t?.logo_url && (
+                            <img src={t.logo_url} alt="" className="w-8 h-8 object-contain bg-white/5 rounded p-0.5" />
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
 
