@@ -268,42 +268,6 @@ const AdminMatches: React.FC = () => {
                 </div>
               </div>
 
-              {/* Selected teams preview */}
-              {(matchTeam1 || matchTeam2) && (
-                <div className="flex items-center justify-center gap-6 p-4 rounded-xl bg-white/5 border border-white/10">
-                  <div className="flex items-center gap-2">
-                    {(() => {
-                      const t = teamOptions.find(o => o.value === matchTeam1);
-                      return (
-                        <>
-                          {t?.logo_url && (
-                            <img src={t.logo_url} alt="" className="w-8 h-8 object-contain bg-white/5 rounded p-0.5" />
-                          )}
-                          <span className="text-white font-medium text-sm">
-                            {t?.label || '—'}
-                          </span>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  <span className="text-gray-500 text-xs font-bold">VS</span>
-                  <div className="flex items-center gap-2">
-                    {(() => {
-                      const t = teamOptions.find(o => o.value === matchTeam2);
-                      return (
-                        <>
-                          <span className="text-white font-medium text-sm">
-                            {t?.label || '—'}
-                          </span>
-                          {t?.logo_url && (
-                            <img src={t.logo_url} alt="" className="w-8 h-8 object-contain bg-white/5 rounded p-0.5" />
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
 
               {/* Match Kickoff */}
               <div className="space-y-1.5">
@@ -328,15 +292,6 @@ const AdminMatches: React.FC = () => {
                   <DateTimePicker value={matchCloseTime} onChange={setMatchCloseTime} />
                 </div>
               </div>
-
-              {/* Time ordering hint */}
-              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                <span className="text-blue-400 text-xs mt-0.5">ℹ️</span>
-                <p className="text-xs text-blue-300">
-                  <span className="font-semibold">Time order required:</span> Prediction Open → Prediction Close → Match Kickoff
-                </p>
-              </div>
-
 
               {editingMatch && (
                 <div className="space-y-1.5">
