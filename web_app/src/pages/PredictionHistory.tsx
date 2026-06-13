@@ -39,7 +39,7 @@ const mapBackendMatchToFrontend = (m: any): Match => {
     date: dateStr,
     time: timeStr,
     venue: 'Santiago Bernabeu, Madrid',
-    competition: 'UEFA Champions League',
+    competition: 'FIFA World Cup 2026',
     status: m.status as any,
     homeScore: m.status === 'completed' ? (m.winning_team_id === m.team1_id ? 1 : 0) : undefined,
     awayScore: m.status === 'completed' ? (m.winning_team_id === m.team2_id ? 1 : 0) : undefined,
