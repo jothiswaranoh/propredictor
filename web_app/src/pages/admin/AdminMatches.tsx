@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '../../components/ui/label';
 import { api } from '../../lib/api';
 import { useToast } from '../../hooks/use-toast';
-import { formatToIST, parseDatetimeKolkata, formatDatetimeLocal } from './AdminLayout';
+import { formatToIST } from './AdminLayout';
 import { AdminPagination } from '../../components/admin/AdminPagination';
 import { AdminSelect } from '../../components/admin/AdminSelect';
 import { DateTimePicker } from '../../components/admin/DateTimePicker';
@@ -139,9 +139,9 @@ const AdminMatches: React.FC = () => {
       const payload = {
         team1_id: matchTeam1,
         team2_id: matchTeam2,
-        match_date: parseDatetimeKolkata(matchDate),
-        prediction_open_time: parseDatetimeKolkata(matchOpenTime),
-        prediction_close_time: parseDatetimeKolkata(matchCloseTime),
+        match_date: matchDate,
+        prediction_open_time: matchOpenTime,
+        prediction_close_time: matchCloseTime,
         status: matchStatus,
       };
 
@@ -205,9 +205,9 @@ const AdminMatches: React.FC = () => {
     setEditingMatch(row);
     setMatchTeam1(row.team1_id);
     setMatchTeam2(row.team2_id);
-    setMatchDate(formatDatetimeLocal(row.match_date));
-    setMatchOpenTime(formatDatetimeLocal(row.prediction_open_time));
-    setMatchCloseTime(formatDatetimeLocal(row.prediction_close_time));
+    setMatchDate(row.match_date);
+    setMatchOpenTime(row.prediction_open_time);
+    setMatchCloseTime(row.prediction_close_time);
     setMatchStatus(row.status);
     setMatchDialogOpen(true);
   };

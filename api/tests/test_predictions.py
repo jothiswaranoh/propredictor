@@ -7,7 +7,7 @@ async def test_prediction_workflow(client: AsyncClient):
     # 1. Login as admin
     login_response = await client.post(
         "/api/auth/login",
-        json={"email": "admin@company.com", "password": "EMP001"}
+        json={"username": "admin", "password": "EMP001"}
     )
     assert login_response.status_code == 200
     admin_token = login_response.json()["access_token"]
@@ -18,7 +18,7 @@ async def test_prediction_workflow(client: AsyncClient):
         "/api/admin/users",
         json={
             "name": "Standard User",
-            "email": "user@company.com",
+            "username": "user",
             "password": "EMP002",
             "role": "user",
             "active": True
@@ -31,7 +31,7 @@ async def test_prediction_workflow(client: AsyncClient):
     # Login as standard user
     user_login = await client.post(
         "/api/auth/login",
-        json={"email": "user@company.com", "password": "EMP002"}
+        json={"username": "user", "password": "EMP002"}
     )
     assert user_login.status_code == 200
     user_token = user_login.json()["access_token"]
@@ -125,7 +125,7 @@ async def test_prediction_draw_workflow(client: AsyncClient):
     # 1. Login as admin
     login_response = await client.post(
         "/api/auth/login",
-        json={"email": "admin@company.com", "password": "EMP001"}
+        json={"username": "admin", "password": "EMP001"}
     )
     assert login_response.status_code == 200
     admin_token = login_response.json()["access_token"]
@@ -136,7 +136,7 @@ async def test_prediction_draw_workflow(client: AsyncClient):
         "/api/admin/users",
         json={
             "name": "Draw Predicting User",
-            "email": "draw_user@company.com",
+            "username": "draw_user",
             "password": "EMP003",
             "role": "user",
             "active": True
@@ -149,7 +149,7 @@ async def test_prediction_draw_workflow(client: AsyncClient):
     # Login as standard user
     user_login = await client.post(
         "/api/auth/login",
-        json={"email": "draw_user@company.com", "password": "EMP003"}
+        json={"username": "draw_user", "password": "EMP003"}
     )
     assert user_login.status_code == 200
     user_token = user_login.json()["access_token"]
