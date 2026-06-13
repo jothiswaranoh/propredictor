@@ -1,4 +1,4 @@
-import { CalendarIcon, Clock } from 'lucide-react';
+import { CalendarIcon, Clock, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -59,18 +59,23 @@ export function DateTimePicker({
   className = '',
   disabled = false,
 }: DateTimePickerProps) {
+
   // Calendar component requires a Date in local browser timezone that matches the calendar date digits of IST
   const localDateForCalendar = value ? (() => {
     const parts = getISTParts(new Date(value));
     return new Date(parts.year, parts.month - 1, parts.day);
   })() : undefined;
 
-  const timeValueString = value ? (() => {
-    const parts = getISTParts(new Date(value));
-    const hh = String(parts.hour).padStart(2, '0');
-    const mm = String(parts.minute).padStart(2, '0');
-    return `${hh}:${mm}`;
-  })() : '';
+  // Get 12-hour format parts for adjustments
+  const get12HourParts = (hour24: number): { hour12: number; ampm: 'AM' | 'PM' } => {
+    const ampm = hour24 >= 12 ? 'PM' : 'AM';
+    let hour12 = hour24 % 12;
+    if (hour12 === 0) hour12 = 12;
+    return { hour12, ampm };
+  };
+
+  const { hour12, ampm } = value ? get12HourParts(getISTParts(new Date(value)).hour) : { hour12: 12, ampm: 'AM' as const };
+  const minuteVal = value ? getISTParts(new Date(value)).minute : 0;
 
   const handleDateChange = (date?: Date) => {
     if (!date) return;
@@ -85,23 +90,39 @@ export function DateTimePicker({
     onChange(utcIso);
   };
 
-  const handleTimeChange = (time: string) => {
-    if (!time) return;
-    const [hours, minutes] = time.split(':').map(Number);
+  const handle12HourTimeChange = (h12: number, min: number, am_pm: 'AM' | 'PM') => {
+    let h24 = h12;
+    if (am_pm === 'PM' && h12 < 12) h24 += 12;
+    if (am_pm === 'AM' && h12 === 12) h24 = 0;
+
     const currentIST = value ? getISTParts(new Date(value)) : getISTParts(new Date());
     const utcIso = getUtcIsoString(
       currentIST.year,
       currentIST.month,
       currentIST.day,
-      hours,
-      minutes
+      h24,
+      min
     );
     onChange(utcIso);
   };
 
+  const adjustHour = (amount: number) => {
+    let nextHour = hour12 + amount;
+    if (nextHour > 12) nextHour = 1;
+    if (nextHour < 1) nextHour = 12;
+    handle12HourTimeChange(nextHour, minuteVal, ampm);
+  };
+
+  const adjustMinute = (amount: number) => {
+    let nextMinute = minuteVal + amount;
+    if (nextMinute >= 60) nextMinute = 0;
+    if (nextMinute < 0) nextMinute = 59;
+    handle12HourTimeChange(hour12, nextMinute, ampm);
+  };
+
   return (
     <div className={className}>
-      <Popover>
+      <Popover modal={false}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
@@ -120,33 +141,94 @@ export function DateTimePicker({
         </PopoverTrigger>
 
         <PopoverContent
-          className="w-auto p-3 bg-gray-900 border-white/10"
+          className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-900 border border-white/10 text-white rounded-xl w-auto shadow-2xl max-h-[80vh] sm:max-h-none overflow-y-auto"
           align="start"
         >
-          <Calendar
-            mode="single"
-            selected={localDateForCalendar}
-            onSelect={handleDateChange}
-            initialFocus
-          />
-
-          <div className="mt-3 border-t border-white/10 pt-3">
-            <label className="mb-2 flex items-center gap-2 text-sm text-gray-300">
-              <Clock className="h-4 w-4" />
-              Time <span className="text-gray-500 text-xs">(IST)</span>
-            </label>
-
-            <input
-              type="time"
-              value={timeValueString}
-              onChange={(e) => handleTimeChange(e.target.value)}
-              className="
-                w-full rounded-lg
-                bg-white/5 border border-white/10
-                px-3 py-2 text-white
-                [color-scheme:dark]
-              "
+          <div>
+            <Calendar
+              mode="single"
+              selected={localDateForCalendar}
+              onSelect={handleDateChange}
+              initialFocus
             />
+          </div>
+
+          <div className="sm:border-l sm:border-white/10 sm:pl-4 flex flex-col items-center justify-center min-w-[140px] pt-3 sm:pt-0">
+            <span className="text-xs text-gray-400 font-semibold mb-3 flex items-center gap-1.5 uppercase tracking-wider">
+              <Clock className="w-3.5 h-3.5 text-green-400" /> Time (IST)
+            </span>
+
+            <div className="flex items-center gap-3">
+              {/* Hours adjuster */}
+              <div className="flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={() => adjustHour(1)}
+                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                >
+                  <ChevronUp className="w-5 h-5" />
+                </button>
+                <span className="text-2xl font-bold font-mono text-white select-none">
+                  {String(hour12).padStart(2, '0')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => adjustHour(-1)}
+                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </button>
+              </div>
+
+              <span className="text-xl font-bold text-gray-500 mb-1">:</span>
+
+              {/* Minutes adjuster */}
+              <div className="flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={() => adjustMinute(1)}
+                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                >
+                  <ChevronUp className="w-5 h-5" />
+                </button>
+                <span className="text-2xl font-bold font-mono text-white select-none">
+                  {String(minuteVal).padStart(2, '0')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => adjustMinute(-1)}
+                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* AM/PM Toggle */}
+              <div className="flex flex-col gap-1.5 ml-1">
+                <button
+                  type="button"
+                  onClick={() => handle12HourTimeChange(hour12, minuteVal, 'AM')}
+                  className={`px-2 py-1 text-xs font-bold rounded transition-all border ${
+                    ampm === 'AM'
+                      ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                      : 'text-gray-500 hover:text-white border-transparent'
+                  }`}
+                >
+                  AM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handle12HourTimeChange(hour12, minuteVal, 'PM')}
+                  className={`px-2 py-1 text-xs font-bold rounded transition-all border ${
+                    ampm === 'PM'
+                      ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                      : 'text-gray-500 hover:text-white border-transparent'
+                  }`}
+                >
+                  PM
+                </button>
+              </div>
+            </div>
           </div>
         </PopoverContent>
       </Popover>

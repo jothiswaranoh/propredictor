@@ -236,7 +236,7 @@ const AdminMatches: React.FC = () => {
               <Plus className="w-4 h-4 mr-2" /> Add Match
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-gray-900 border border-white/10 text-white rounded-2xl max-w-lg">
+          <DialogContent className="bg-gray-900 border border-white/10 text-white rounded-2xl max-w-lg w-[95vw] max-h-[95vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-white text-lg font-semibold">
                 {editingMatch ? '✏️ Edit Match' : '📅 Schedule New Match'}
@@ -245,7 +245,7 @@ const AdminMatches: React.FC = () => {
 
             <div className="space-y-5 pt-2">
               {/* Teams */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-gray-400 text-xs uppercase tracking-wide">Home Team</Label>
                   <AdminSelect
@@ -278,7 +278,7 @@ const AdminMatches: React.FC = () => {
               </div>
 
               {/* Prediction Window */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-gray-400 text-xs uppercase tracking-wide">
                     Prediction Opens <span className="text-gray-600">(IST)</span>
@@ -385,8 +385,8 @@ const AdminMatches: React.FC = () => {
               <tr>
                 <th className="text-left p-4 text-sm font-medium text-gray-400">Match</th>
                 <th className="text-left p-4 text-sm font-medium text-gray-400">Kickoff (IST)</th>
-                <th className="text-left p-4 text-sm font-medium text-gray-400">Pred. Open</th>
-                <th className="text-left p-4 text-sm font-medium text-gray-400">Pred. Close</th>
+                <th className="text-left p-4 text-sm font-medium text-gray-400 hidden md:table-cell">Pred. Open</th>
+                <th className="text-left p-4 text-sm font-medium text-gray-400 hidden md:table-cell">Pred. Close</th>
                 <th className="text-left p-4 text-sm font-medium text-gray-400">Status</th>
                 <th className="text-left p-4 text-sm font-medium text-gray-400">Winner</th>
                 <th className="text-right p-4 text-sm font-medium text-gray-400">Actions</th>
@@ -453,8 +453,8 @@ const AdminMatches: React.FC = () => {
 
                       {/* Dates */}
                       <td className="p-4 text-sm text-gray-300 whitespace-nowrap">{formatToIST(row.match_date)}</td>
-                      <td className="p-4 text-sm text-gray-400 whitespace-nowrap">{formatToIST(row.prediction_open_time)}</td>
-                      <td className="p-4 text-sm text-gray-400 whitespace-nowrap">{formatToIST(row.prediction_close_time)}</td>
+                      <td className="p-4 text-sm text-gray-400 whitespace-nowrap hidden md:table-cell">{formatToIST(row.prediction_open_time)}</td>
+                      <td className="p-4 text-sm text-gray-400 whitespace-nowrap hidden md:table-cell">{formatToIST(row.prediction_close_time)}</td>
 
                       {/* Status */}
                       <td className="p-4 text-sm">
