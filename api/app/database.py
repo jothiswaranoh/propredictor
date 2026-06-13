@@ -27,8 +27,12 @@ async def close_mongo_connection():
 async def init_db():
     db = db_helper.db
 
-    # 1. users: unique email
-    await db.users.create_index("email", unique=True)
+    # 1. users: unique username
+    try:
+        await db.users.drop_index("email_1")
+    except Exception:
+        pass
+    await db.users.create_index("username", unique=True)
 
     # Drop outdated unique employee_id index if it exists
     try:

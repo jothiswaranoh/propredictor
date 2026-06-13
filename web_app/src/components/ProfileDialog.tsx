@@ -8,7 +8,7 @@ import { useToast } from '../hooks/use-toast';
 interface ProfileDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  userProfile?: { name: string; email: string; avatar?: string } | null;
+  userProfile?: { name: string; username: string; avatar?: string } | null;
   onUpdateProfile?: (name: string, avatar?: string) => Promise<void>;
   onResetPassword: (password: string) => Promise<void>;
   isAdmin?: boolean;
@@ -160,8 +160,8 @@ export function ProfileDialog({
                 </div>
               </div>
               <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
-                <p className="text-sm text-gray-400">Username (Email)</p>
-                <p className="font-semibold text-white">{userProfile.email}</p>
+                <p className="text-sm text-gray-400">Username</p>
+                <p className="font-semibold text-white">{userProfile.username}</p>
               </div>
             </>
           )}

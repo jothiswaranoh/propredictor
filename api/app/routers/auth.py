@@ -11,7 +11,7 @@ async def login(
     login_data: LoginRequest,
     auth_service: AuthService = Depends(get_auth_service)
 ):
-    user = await auth_service.authenticate_user(login_data.email, login_data.password)
+    user = await auth_service.authenticate_user(login_data.username, login_data.password)
     token_str = auth_service.create_token_for_user(user)
     return Token(access_token=token_str)
 

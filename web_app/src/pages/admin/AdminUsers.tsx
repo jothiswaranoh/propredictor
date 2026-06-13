@@ -48,7 +48,7 @@ const AdminUsers: React.FC = () => {
 
   // Add/Edit User Form States
   const [newUserName, setNewUserName] = useState('');
-  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserUsername, setNewUserUsername] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState('user');
   const [userDialogOpen, setUserDialogOpen] = useState(false);
@@ -79,14 +79,14 @@ const AdminUsers: React.FC = () => {
     if (!userDialogOpen) {
       setEditingUser(null);
       setNewUserName('');
-      setNewUserEmail('');
+      setNewUserUsername('');
       setNewUserPassword('');
       setNewUserRole('user');
     }
   }, [userDialogOpen]);
 
   const handleCreateUser = async () => {
-    if (!newUserName || !newUserEmail || !newUserPassword) {
+    if (!newUserName || !newUserUsername || !newUserPassword) {
       toast({ title: "Validation Error", description: "All fields are required.", variant: "destructive" });
       return;
     }
@@ -94,7 +94,7 @@ const AdminUsers: React.FC = () => {
       if (editingUser) {
         await api.adminUpdateUser(editingUser.id, {
           name: newUserName,
-          email: newUserEmail,
+          username: newUserUsername,
           password: newUserPassword,
           role: newUserRole,
         });
@@ -102,7 +102,7 @@ const AdminUsers: React.FC = () => {
       } else {
         await api.adminCreateUser({
           name: newUserName,
-          email: newUserEmail,
+          username: newUserUsername,
           password: newUserPassword,
           role: newUserRole,
         });
@@ -143,7 +143,7 @@ const AdminUsers: React.FC = () => {
           </div>
           <div>
             <span className="text-white font-medium">{value}</span>
-            <p className="text-xs text-gray-500">{row.email}</p>
+            <p className="text-xs text-gray-500">{row.username}</p>
           </div>
         </div>
       )
@@ -215,12 +215,12 @@ const AdminUsers: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-gray-300">Email Address</Label>
+                <Label className="text-gray-300">Username</Label>
                 <Input
-                  type="email"
-                  placeholder="john@gmail.com"
-                  value={newUserEmail}
-                  onChange={e => setNewUserEmail(e.target.value)}
+                  type="text"
+                  placeholder="john_doe"
+                  value={newUserUsername}
+                  onChange={e => setNewUserUsername(e.target.value)}
                   className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50"
                 />
               </div>
@@ -254,7 +254,7 @@ const AdminUsers: React.FC = () => {
           <div className="relative flex-1 w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
-              placeholder="Search by name or email..."
+              placeholder="Search by name or username..."
               value={userSearch}
               onChange={(e) => setUserSearch(e.target.value)}
               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
@@ -342,7 +342,7 @@ const AdminUsers: React.FC = () => {
                             onClick={() => {
                               setEditingUser(row);
                               setNewUserName(row.name);
-                              setNewUserEmail(row.email);
+                              setNewUserUsername(row.username);
                               setNewUserPassword(row.password);
                               setNewUserRole(row.role);
                               setUserDialogOpen(true);

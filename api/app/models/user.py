@@ -4,7 +4,7 @@ from app.models.base import MongoBaseModel
 
 class User(MongoBaseModel):
     name: str
-    email: str
+    username: str
     password: str
     role: str = "user"  # "admin" or "user"
     active: bool = True

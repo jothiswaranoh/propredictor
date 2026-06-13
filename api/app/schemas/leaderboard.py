@@ -4,7 +4,7 @@ from typing import List, Optional
 class LeaderboardEntry(BaseModel):
     user_id: str
     name: str
-    email: str
+    username: str
     points: int
     rank: int
     avatar: Optional[str] = None

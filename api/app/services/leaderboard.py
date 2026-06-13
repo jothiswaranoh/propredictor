@@ -23,7 +23,7 @@ class LeaderboardService:
                 LeaderboardEntry(
                     user_id=str(entry["user_id"]),
                     name=entry["name"],
-                    email=entry["email"],
+                    username=entry.get("username") or entry.get("email") or "",
                     points=entry["points"],
                     rank=entry["rank"],
                     avatar=entry.get("avatar")
@@ -62,7 +62,7 @@ class LeaderboardService:
                 "$project": {
                     "_id": 1,
                     "name": 1,
-                    "email": 1,
+                    "username": { "$ifNull": ["$username", "$email"] },
                     "avatar": 1,
                     "is_correct": {
                         "$cond": [
@@ -82,7 +82,7 @@ class LeaderboardService:
                 "$group": {
                     "_id": "$_id",
                     "name": { "$first": "$name" },
-                    "email": { "$first": "$email" },
+                    "username": { "$first": "$username" },
                     "avatar": { "$first": "$avatar" },
                     "points": { "$sum": "$is_correct" }
                 }
@@ -112,7 +112,7 @@ class LeaderboardService:
             entries.append({
                 "user_id": str(row["_id"]),
                 "name": row["name"],
-                "email": row["email"],
+                "username": row.get("username") or row.get("email") or "",
                 "avatar": row.get("avatar"),
                 "points": points,
                 "rank": current_rank,
@@ -132,7 +132,7 @@ class LeaderboardService:
                 LeaderboardEntry(
                     user_id=entry["user_id"],
                     name=entry["name"],
-                    email=entry["email"],
+                    username=entry["username"],
                     points=entry["points"],
                     rank=entry["rank"],
                     avatar=entry.get("avatar")

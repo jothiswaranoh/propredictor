@@ -15,13 +15,12 @@ CREATED_AT = datetime.now(UTC)
 USERS_TO_SEED = [
     {
         "name": "Athu",
-        "email": "athu@gmail.com",
+        "username": "athu",
         "password": "HAI-200",
         "role": "user",
         "active": True,
         "created_at": CREATED_AT,
     },
-
 ]
 
 
@@ -39,7 +38,11 @@ async def seed_users() -> None:
         print("✅ MongoDB connection successful")
 
         # Create indexes
-        await db.users.create_index("email", unique=True)
+        try:
+            await db.users.drop_index("email_1")
+        except Exception:
+            pass
+        await db.users.create_index("username", unique=True)
         await db.users.create_index("password", unique=True)
 
         seeded_count = 0
@@ -48,7 +51,7 @@ async def seed_users() -> None:
             existing_user = await db.users.find_one(
                 {
                     "$or": [
-                        {"email": user["email"]},
+                        {"username": user["username"]},
                         {"password": user["password"]},
                     ]
                 }
@@ -57,7 +60,7 @@ async def seed_users() -> None:
             if existing_user:
                 print(
                     f"⚠️ User already exists: "
-                    f"{user['email']} ({user['password']})"
+                    f"{user['username']} ({user['password']})"
                 )
                 continue
 
@@ -66,7 +69,7 @@ async def seed_users() -> None:
             print(
                 f"✅ Seeded: "
                 f"{user['name']} "
-                f"({user['email']})"
+                f"({user['username']})"
             )
 
             seeded_count += 1

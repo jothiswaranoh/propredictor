@@ -19,10 +19,10 @@ class UserService:
         return await self.user_repo.get_all(sort_by="name")
 
     async def create_user(self, user_data: UserCreate) -> User:
-        # Check duplicate email
-        existing_email = await self.user_repo.get_by_email(user_data.email)
-        if existing_email:
-            raise ConflictException("Email already exists")
+        # Check duplicate username
+        existing_username = await self.user_repo.get_by_username(user_data.username)
+        if existing_username:
+            raise ConflictException("Username already exists")
 
         user_dict = user_data.model_dump()
         user_dict["created_at"] = datetime.utcnow()
@@ -33,10 +33,10 @@ class UserService:
         
         update_dict = user_data.model_dump(exclude_unset=True)
         
-        if "email" in update_dict and update_dict["email"] != user.email:
-            existing = await self.user_repo.get_by_email(update_dict["email"])
+        if "username" in update_dict and update_dict["username"] != user.username:
+            existing = await self.user_repo.get_by_username(update_dict["username"])
             if existing:
-                raise ConflictException("Email already exists")
+                raise ConflictException("Username already exists")
 
         return await self.user_repo.update(user_id, update_dict)
 
@@ -57,7 +57,7 @@ class UserService:
         if search:
             filter_query["$or"] = [
                 {"name": {"$regex": search, "$options": "i"}},
-                {"email": {"$regex": search, "$options": "i"}}
+                {"username": {"$regex": search, "$options": "i"}}
             ]
             
         if role:

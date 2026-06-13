@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, IdCard, ArrowRight, Shield, Trophy, Users, Eye, EyeOff } from 'lucide-react';
+import { User, IdCard, ArrowRight, Shield, Trophy, Users, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -10,7 +10,7 @@ import { useToast } from '../hooks/use-toast';
 import loginWallpaper from '../assets/login_wallpaper.jpg';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -21,7 +21,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const user = await api.login(email, password);
+      const user = await api.login(username, password);
       toast({
         title: "Login Successful",
         description: `Welcome back, ${user.name}!`,
@@ -34,7 +34,7 @@ const Login: React.FC = () => {
     } catch (err: any) {
       toast({
         title: "Login Failed",
-        description: err.message || "Invalid email or password",
+        description: err.message || "Invalid username or password",
         variant: "destructive",
       });
     } finally {
@@ -79,16 +79,16 @@ const Login: React.FC = () => {
               transition={{ delay: 0.3 }}
               className="space-y-2"
             >
-              <Label htmlFor="email" className="text-gray-300 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-green-400" />
-                Email
+              <Label htmlFor="username" className="text-gray-300 flex items-center gap-2">
+                <User className="w-4 h-4 text-green-400" />
+                Username
               </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="username@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50 focus:ring-green-500/20"
                 required
               />

@@ -135,7 +135,7 @@ class PredictionService:
             matched_users = await self.user_repo.get_all(filter_query={
                 "$or": [
                     {"name": {"$regex": search, "$options": "i"}},
-                    {"email": {"$regex": search, "$options": "i"}}
+                    {"username": {"$regex": search, "$options": "i"}}
                 ]
             })
             user_ids = [self.prediction_repo._to_object_id(u.id) for u in matched_users]

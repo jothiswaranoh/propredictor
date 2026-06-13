@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, IdCard, ArrowRight, Shield, Trophy, Users, User, Eye, EyeOff } from 'lucide-react';
+import { IdCard, ArrowRight, Shield, Trophy, Users, User, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,7 +11,7 @@ import loginWallpaper from '../assets/login_wallpaper.jpg';
 
 const Signup: React.FC = () => {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -22,7 +22,7 @@ const Signup: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await api.signup(name, email, password);
+      await api.signup(name, username, password);
       toast({
         title: "Signup Successful",
         description: "You have successfully signed up! Please login.",
@@ -96,16 +96,16 @@ const Signup: React.FC = () => {
               transition={{ delay: 0.4 }}
               className="space-y-2"
             >
-              <Label htmlFor="email" className="text-gray-300 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-green-400" />
-                Email Address
+              <Label htmlFor="username" className="text-gray-300 flex items-center gap-2">
+                <User className="w-4 h-4 text-green-400" />
+                Username
               </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="username@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-green-500/50 focus:ring-green-500/20"
                 required
               />

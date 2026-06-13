@@ -12,7 +12,7 @@ class AuthService:
         self.user_repo = user_repo
 
     async def register_user(self, user_data: UserCreate) -> User:
-        existing_user = await self.user_repo.get_by_email(user_data.email)
+        existing_user = await self.user_repo.get_by_username(user_data.username)
         if existing_user:
             raise AuthException("Username already registered")
         
@@ -21,8 +21,8 @@ class AuthService:
         user = await self.user_repo.create(user_dict)
         return user
 
-    async def authenticate_user(self, email: str, password: str) -> User:
-        user = await self.user_repo.get_by_email_and_password(email, password)
+    async def authenticate_user(self, username: str, password: str) -> User:
+        user = await self.user_repo.get_by_username_and_password(username, password)
         if not user:
             raise AuthException("Invalid username or password")
         if not user.active:
@@ -32,7 +32,7 @@ class AuthService:
     def create_token_for_user(self, user: User) -> str:
         token_data = {
             "sub": str(user.id),
-            "email": user.email,
+            "username": user.username,
             "role": user.role
         }
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -43,11 +43,11 @@ class AuthService:
         try:
             payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
             user_id: str = payload.get("sub")
-            email: str = payload.get("email")
+            username: str = payload.get("username")
             role: str = payload.get("role")
-            if user_id is None or email is None or role is None:
+            if user_id is None or username is None or role is None:
                 raise AuthException("Could not validate credentials")
-            return {"user_id": user_id, "email": email, "role": role}
+            return {"user_id": user_id, "username": username, "role": role}
         except jwt.ExpiredSignatureError:
             raise AuthException("Token has expired")
         except jwt.PyJWTError:

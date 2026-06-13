@@ -1,8 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from typing import Optional
 
 class LoginRequest(BaseModel):
-    email: EmailStr = Field(..., description="Company email address")
+    username: str = Field(..., description="Username")
     password: str = Field(..., description="Unique Password")
 
 class Token(BaseModel):
@@ -11,5 +11,5 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     user_id: str
-    email: str
+    username: str
     role: str
