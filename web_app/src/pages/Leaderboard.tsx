@@ -24,8 +24,8 @@ const mapBackendLeaderboardToFrontend = (l: any): LeaderboardEntry => {
     userId: l.user_id,
     userName: l.name,
     points: l.points,
-    predictions: l.predictions || 10,
-    accuracy: l.accuracy || 70,
+    predictions: l.predictions ?? 0,
+    accuracy: l.accuracy ?? 0,
     avatar: l.avatar,
   };
 };
@@ -191,7 +191,6 @@ const LeaderboardPage: React.FC = () => {
                       <SelectItem value="rank" className="hover:bg-white/5 focus:bg-white/10 focus:text-white cursor-pointer">Sort by Rank</SelectItem>
                       <SelectItem value="points" className="hover:bg-white/5 focus:bg-white/10 focus:text-white cursor-pointer">Sort by Points</SelectItem>
                       <SelectItem value="predictions" className="hover:bg-white/5 focus:bg-white/10 focus:text-white cursor-pointer">Sort by Predictions</SelectItem>
-                      <SelectItem value="accuracy" className="hover:bg-white/5 focus:bg-white/10 focus:text-white cursor-pointer">Sort by Accuracy</SelectItem>
                     </SelectContent>
                   </Select>
                   <Button
@@ -214,7 +213,7 @@ const LeaderboardPage: React.FC = () => {
                     <div className="col-span-1 text-center">Rank</div>
                     <div className="col-span-5">Player</div>
                     <div className="col-span-2 text-center">Predictions</div>
-                    <div className="col-span-2 text-center">Accuracy</div>
+                    <div className="col-span-2 text-center">Won</div>
                     <div className="col-span-2 text-right">Points</div>
                   </div>
 
@@ -257,12 +256,8 @@ const LeaderboardPage: React.FC = () => {
                         </div>
 
                         <div className="col-span-2 flex items-center justify-between md:justify-center">
-                          <span className="md:hidden text-xs text-gray-400 font-semibold uppercase tracking-wider">Accuracy</span>
-                          <span className="text-sm font-medium flex items-center gap-1.5">
-                            <span className={entry.accuracy >= 70 ? 'text-green-400' : entry.accuracy >= 40 ? 'text-yellow-400' : 'text-red-400'}>
-                              {entry.accuracy}%
-                            </span>
-                          </span>
+                          <span className="md:hidden text-xs text-gray-400 font-semibold uppercase tracking-wider">Won</span>
+                          <span className="text-sm text-gray-300 font-medium">{entry.points}</span>
                         </div>
 
                         <div className="col-span-2 flex items-center justify-between md:justify-end border-t border-white/10 md:border-t-0 pt-3 md:pt-0 mt-3 md:mt-0">
