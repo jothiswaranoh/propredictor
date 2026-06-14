@@ -87,8 +87,8 @@ const mapBackendLeaderboardToFrontend = (l: any): LeaderboardEntry => {
     userId: l.user_id,
     userName: l.name,
     points: l.points,
-    predictions: 10,
-    accuracy: 70,
+    predictions: l.predictions ?? 0,
+    accuracy: l.accuracy ?? 0,
   };
 };
 
@@ -206,7 +206,7 @@ const Dashboard: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['predictionHistory'] });
       queryClient.invalidateQueries({ queryKey: ['leaderboardList'] });
-      
+
       const isUpdate = prediction !== null;
       setPrediction(pendingSelection);
       toast({
@@ -238,7 +238,7 @@ const Dashboard: React.FC = () => {
       : pendingSelection === 'home'
         ? selectedMatch.homeTeam.id
         : selectedMatch.awayTeam.id;
-        
+
     submitPredictionMutation.mutate({ matchId: selectedMatch.id, teamId: predictedTeamId });
   };
 
@@ -246,6 +246,20 @@ const Dashboard: React.FC = () => {
   const userRank = leaderboardList.find(e => e.userId === userProfile?.id) ||
     leaderboardList.find(e => e.userName === userProfile?.name) ||
     { rank: '-', points: 0, predictions: 0, accuracy: 0 };
+
+  const totalPlayers = leaderboardList.length;
+  const topPercentage = userRank.rank !== '-' && totalPlayers > 0 
+    ? Math.max(1, Math.ceil((Number(userRank.rank) / totalPlayers) * 100))
+    : null;
+
+  const nextPlayer = userRank.rank !== '-' 
+    ? leaderboardList.slice().reverse().find(e => e.points > userRank.points)
+    : null;
+    
+  const pointsToNext = nextPlayer ? (nextPlayer.points - userRank.points) * 10 : 0;
+  const progressToNext = nextPlayer && nextPlayer.points > 0
+    ? Math.min(100, Math.max(0, (userRank.points / nextPlayer.points) * 100))
+    : 100;
 
   if (loading) {
     return (
@@ -285,14 +299,14 @@ const Dashboard: React.FC = () => {
                   <span className="text-sm font-medium">{(userRank?.points || 0) * 10} pts</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div 
+                  <div
                     className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden cursor-pointer hover:ring-2 hover:ring-white/50 transition-all border border-white/10 shrink-0"
                     onClick={() => setProfileOpen(true)}
                   >
                     {userProfile?.avatar ? (
                       <img src={userProfile.avatar} alt={userProfile.name} className="w-full h-full object-cover" />
                     ) : userProfile?.name ? (
-                      <img 
+                      <img
                         src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userProfile.name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffdfbf,ffd5dc`}
                         alt={userProfile.name}
                         className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
@@ -544,32 +558,38 @@ const Dashboard: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Card className="glass-card p-6 h-full">
+              <Card className="glass-card p-6 h-full flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-gray-200 flex items-center gap-2">
                     <Target className="w-4 h-4 text-green-400" />
                     Your Prediction Stats
                   </h3>
-                  <Badge variant="secondary" className="bg-green-500/10 text-green-400">
-                    Top 30%
-                  </Badge>
+                  {topPercentage !== null ? (
+                    <Badge variant="secondary" className="bg-green-500/10 text-green-400">
+                      Top {topPercentage}%
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="bg-gray-500/10 text-gray-400">
+                      Unranked
+                    </Badge>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 rounded-xl bg-white/5">
-                    <div className="text-2xl font-bold text-gradient">{userRank?.accuracy || 0}%</div>
-                    <p className="text-xs text-gray-400">Accuracy</p>
-                  </div>
                   <div className="text-center p-3 rounded-xl bg-white/5">
                     <div className="text-2xl font-bold text-blue-400">{userRank?.predictions || 0}</div>
                     <p className="text-xs text-gray-400">Predictions</p>
                   </div>
-                </div>
-                <div className="mt-4">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">Progress to next rank</span>
-                    <span className="text-green-400">15 pts away</span>
+                  <div className="text-center p-3 rounded-xl bg-white/5">
+                    <div className="text-2xl font-bold text-green-400">{userRank?.points || 0}</div>
+                    <p className="text-xs text-gray-400">Won</p>
                   </div>
-                  <Progress value={75} className="h-2" />
+                </div>
+                <div className="mt-auto pt-4">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-400">{nextPlayer ? "Progress to next rank" : "Top Rank!"}</span>
+                    <span className="text-green-400">{nextPlayer ? `${pointsToNext} pts away` : 'Maxed out'}</span>
+                  </div>
+                  <Progress value={progressToNext} className="h-2" />
                 </div>
               </Card>
             </motion.div>
@@ -658,18 +678,8 @@ const Dashboard: React.FC = () => {
                           }`}>
                           {entry.rank}
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-gray-700 overflow-hidden">
-                          {entry.avatar ? (
-                            <img src={entry.avatar} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <User className="w-4 h-4 text-gray-400" />
-                            </div>
-                          )}
-                        </div>
                         <div>
                           <p className="text-sm font-medium text-gray-200">{entry.userName}</p>
-                          <p className="text-xs text-gray-500">{entry.accuracy}% accuracy</p>
                         </div>
                       </div>
                       <span className="font-semibold text-green-400">{entry.points * 10} pts</span>
