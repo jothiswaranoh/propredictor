@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
-  Trophy, Clock, Calendar, TrendingUp, ChevronRight,
+  Trophy, Clock, TrendingUp, ChevronRight,
   LogOut, User, Target, Flame, Crown, ArrowUpRight, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -372,10 +372,10 @@ const Dashboard: React.FC = () => {
                         ))}
                       </div>
 
-                      <Button className="gap-2 bg-gradient-to-r from-green-600 to-emerald-500 neon-glow">
+                      {/* <Button className="gap-2 bg-gradient-to-r from-green-600 to-emerald-500 neon-glow">
                         <Calendar className="w-4 h-4" />
                         Add to Calendar
-                      </Button>
+                      </Button> */}
                     </div>
 
                     <div className="flex-1 w-full max-w-2xl">
@@ -497,9 +497,9 @@ const Dashboard: React.FC = () => {
                   <Clock className="w-5 h-5 text-green-400" />
                   Upcoming Matches
                 </h3>
-                <Button variant="outline" size="sm" className="border-white/10 text-gray-300">
+                {/* <Button variant="outline" size="sm" className="border-white/10 text-gray-300">
                   View All <ChevronRight className="w-4 h-4" />
-                </Button>
+                </Button> */}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {upcomingMatches.map((match, idx) => (
