@@ -497,9 +497,9 @@ const Dashboard: React.FC = () => {
                   <Clock className="w-5 h-5 text-green-400" />
                   Upcoming Matches
                 </h3>
-                {/* <Button variant="outline" size="sm" className="border-white/10 text-gray-300">
+                <Button variant="outline" size="sm" className="border-white/10 text-gray-300" onClick={() => navigate('/matches')}>
                   View All <ChevronRight className="w-4 h-4" />
-                </Button> */}
+                </Button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {upcomingMatches.map((match, idx) => (

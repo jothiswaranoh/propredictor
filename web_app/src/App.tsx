@@ -12,6 +12,7 @@ import AdminMatches from './pages/admin/AdminMatches';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminPredictions from './pages/admin/AdminPredictions';
 import { Toaster } from './components/ui/toaster';
+import Matches from './pages/Matches';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +33,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/predictions" element={<PredictionHistory />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/matches" element={<Matches />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="teams" element={<AdminTeams />} />
