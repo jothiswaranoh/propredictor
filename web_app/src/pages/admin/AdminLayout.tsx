@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, Users, Trophy, Calendar, TrendingUp, LogOut, Menu, X, Shield, ChevronRight
+  LayoutDashboard, Users, Trophy, Calendar, TrendingUp, LogOut, Menu, X, Shield, ChevronRight, Crown
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { LogoutConfirmDialog } from '../../components/admin/LogoutConfirmDialog';
 import loginWallpaper from '../../assets/login_wallpaper.jpg';
 
-type TabType = 'dashboard' | 'teams' | 'matches' | 'users' | 'predictions';
+type TabType = 'dashboard' | 'teams' | 'matches' | 'users' | 'predictions' | 'leaderboard';
 
 export const formatToIST = (dateTime: string | Date) => {
   return new Date(dateTime).toLocaleString('en-IN', {
@@ -72,6 +72,7 @@ const AdminLayout: React.FC = () => {
     if (pathname.startsWith('/admin/match')) return 'matches';
     if (pathname.startsWith('/admin/user')) return 'users';
     if (pathname.startsWith('/admin/prediction')) return 'predictions';
+    if (pathname.startsWith('/admin/leaderboard')) return 'leaderboard';
     return 'dashboard';
   };
 
@@ -83,6 +84,7 @@ const AdminLayout: React.FC = () => {
     { id: 'matches', label: 'Matches', icon: Calendar, path: '/admin/matches' },
     { id: 'users', label: 'Users', icon: Users, path: '/admin/users' },
     { id: 'predictions', label: 'Predictions', icon: TrendingUp, path: '/admin/predictions' },
+    { id: 'leaderboard', label: 'Leaderboard', icon: Crown, path: '/admin/leaderboard' },
   ];
 
   return (

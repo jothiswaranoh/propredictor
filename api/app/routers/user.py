@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Query, HTTPException
 from typing import List, Optional
+from datetime import datetime
 from app.models.user import User
-from app.schemas.user import UserResponse
+from app.schemas.user import UserResponse, PublicUserProfileResponse
 from app.schemas.match import MatchDetailResponse
 from app.schemas.prediction import PredictionSubmit, PredictionResponse, PredictionDetailResponse
 from app.schemas.leaderboard import LeaderboardResponse
@@ -136,10 +137,86 @@ async def get_prediction_history(
 
 @router.get("/api/leaderboard", response_model=LeaderboardResponse)
 async def get_leaderboard(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    sort_by: str = Query("rank"),
+    sort_order: str = Query("asc"),
     current_user: User = Depends(get_current_user),
     leaderboard_service: LeaderboardService = Depends(get_leaderboard_service)
 ):
     """
-    Retrieve the current leaderboard rankings.
+    Retrieve the current leaderboard rankings with pagination, search, and sorting.
     """
-    return await leaderboard_service.get_current_leaderboard()
+    return await leaderboard_service.get_current_leaderboard(
+        page=page,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
+
+@router.get("/api/users/{user_id}/profile", response_model=PublicUserProfileResponse)
+async def get_public_user_profile(
+    user_id: str = Path(..., description="The ID of the user whose profile is to be retrieved"),
+    current_user: User = Depends(get_current_user),
+    prediction_service: PredictionService = Depends(get_prediction_service),
+    match_service: MatchService = Depends(get_match_service),
+    user_repo = Depends(get_user_repo)
+):
+    """
+    Get public profile details, leaderboard stats, and prediction history of another user.
+    """
+    from app.database import db_helper
+    
+    # 1. Fetch user
+    user = await user_repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # 2. Get stats from leaderboard cache
+    db = db_helper.db
+    stats_row = await db.leaderboard_cache.find_one({"user_id": user_id})
+    
+    if stats_row:
+        points = stats_row["points"]
+        rank = stats_row["rank"]
+        predictions_count = stats_row["predictions"]
+        accuracy = stats_row["accuracy"]
+    else:
+        # Default fallback if user not in cache yet
+        points = 0
+        rank = 9999
+        predictions_count = 0
+        accuracy = 0.0
+
+    # 3. Get prediction history
+    all_predictions = await prediction_service.get_user_prediction_history(user_id, match_service)
+    
+    # 4. Filter prediction history for privacy: only show closed predictions to others
+    now = datetime.utcnow()
+    is_owner = (user_id == str(current_user.id))
+    
+    filtered_predictions = []
+    for p in all_predictions:
+        # Find close time from the embedded match object
+        close_time_str = p.match.prediction_close_time
+        close_time = datetime.fromisoformat(close_time_str.replace("Z", "+00:00"))
+        
+        if is_owner or close_time <= now:
+            filtered_predictions.append(p)
+            
+    from app.schemas.user import UserProfileStats
+    return PublicUserProfileResponse(
+        profile=UserProfileStats(
+            user_id=str(user.id),
+            name=user.name,
+            username=user.username,
+            avatar=user.avatar,
+            points=points,
+            rank=rank,
+            predictions=predictions_count,
+            accuracy=accuracy
+        ),
+        prediction_history=filtered_predictions
+    )

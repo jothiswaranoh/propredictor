@@ -119,8 +119,16 @@ export const api = {
     return request<any[]>('/api/predictions/history');
   },
 
-  getLeaderboard() {
-    return request<{ leaderboard: any[] }>('/api/leaderboard');
+  getLeaderboard(page = 1, limit = 10, search = '', sortBy = 'rank', sortOrder = 'asc') {
+    let url = `/api/leaderboard?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (sortBy) url += `&sort_by=${encodeURIComponent(sortBy)}`;
+    if (sortOrder) url += `&sort_order=${encodeURIComponent(sortOrder)}`;
+    return request<{ leaderboard: any[]; total: number; page: number; pages: number }>(url);
+  },
+
+  getUserPublicProfile(userId: string) {
+    return request<any>(`/api/users/${userId}/profile`);
   },
 
   // Admin APIs

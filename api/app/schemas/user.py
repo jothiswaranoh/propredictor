@@ -42,3 +42,19 @@ class UserPaginatedResponse(BaseModel):
     page: int
     limit: int
     pages: int
+
+from app.schemas.prediction import PredictionDetailResponse
+
+class UserProfileStats(BaseModel):
+    user_id: str
+    name: str
+    username: str
+    avatar: Optional[str] = None
+    points: int
+    rank: int
+    predictions: int
+    accuracy: float
+
+class PublicUserProfileResponse(BaseModel):
+    profile: UserProfileStats
+    prediction_history: List[PredictionDetailResponse]

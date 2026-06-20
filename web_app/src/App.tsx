@@ -44,6 +44,7 @@ function App() {
             <Route path="user" element={<AdminUsers />} />
             <Route path="predictions" element={<AdminPredictions />} />
             <Route path="prediction" element={<AdminPredictions />} />
+            <Route path="leaderboard" element={<LeaderboardPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

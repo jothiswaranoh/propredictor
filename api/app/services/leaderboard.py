@@ -11,9 +11,55 @@ class LeaderboardService:
     def __init__(self, user_repo: UserRepository):
         self.user_repo = user_repo
 
-    async def get_current_leaderboard(self) -> LeaderboardResponse:
+    async def get_current_leaderboard(
+        self,
+        page: int = 1,
+        limit: int = 10,
+        search: str = None,
+        sort_by: str = "rank",
+        sort_order: str = "asc"
+    ) -> LeaderboardResponse:
         # Always generate real-time data as requested
-        return await self.generate_leaderboard()
+        await self.generate_leaderboard()
+        
+        db = db_helper.db
+        query = {}
+        if search and search.strip():
+            query["name"] = {"$regex": search.strip(), "$options": "i"}
+            
+        total = await db.leaderboard_cache.count_documents(query)
+        import math
+        pages = math.ceil(total / limit) if total > 0 else 1
+        
+        sort_dir = 1 if sort_order == "asc" else -1
+        sort_key = sort_by
+        if sort_key not in ["rank", "points", "predictions", "accuracy"]:
+            sort_key = "rank"
+            
+        sort_criteria = [(sort_key, sort_dir)]
+        if sort_key != "name":
+            sort_criteria.append(("name", 1))
+            
+        cursor = db.leaderboard_cache.find(query).sort(sort_criteria).skip((page - 1) * limit).limit(limit)
+        results = await cursor.to_list(length=limit)
+        
+        return LeaderboardResponse(
+            leaderboard=[
+                LeaderboardEntry(
+                    user_id=row["user_id"],
+                    name=row["name"],
+                    username=row["username"],
+                    points=row["points"],
+                    rank=row["rank"],
+                    avatar=row.get("avatar"),
+                    predictions=row["predictions"],
+                    accuracy=row["accuracy"]
+                ) for row in results
+            ],
+            total=total,
+            page=page,
+            pages=pages
+        )
 
     async def generate_leaderboard(self) -> LeaderboardResponse:
         db = db_helper.db
@@ -133,5 +179,8 @@ class LeaderboardService:
                     predictions=entry["predictions"],
                     accuracy=entry["accuracy"]
                 ) for entry in entries
-            ]
+            ],
+            total=len(entries),
+            page=1,
+            pages=1
         )

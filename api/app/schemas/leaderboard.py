@@ -13,3 +13,6 @@ class LeaderboardEntry(BaseModel):
 
 class LeaderboardResponse(BaseModel):
     leaderboard: List[LeaderboardEntry]
+    total: int = 0
+    page: int = 1
+    pages: int = 1
