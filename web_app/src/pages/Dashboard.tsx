@@ -29,6 +29,29 @@ const mapBackendMatchToFrontend = (m: any): Match => {
   const dateStr = dateObj.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
   const timeStr = dateObj.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
 
+  let userPrediction: Prediction | undefined = undefined;
+  if (m.user_prediction) {
+    let predictedWinner: 'home' | 'away' | 'draw' = 'draw';
+    if (m.user_prediction.winning_team_id === m.team1_id) {
+      predictedWinner = 'home';
+    } else if (m.user_prediction.winning_team_id === m.team2_id) {
+      predictedWinner = 'away';
+    }
+    userPrediction = {
+      id: m.user_prediction.id,
+      matchId: m.id,
+      userId: '',
+      predictedWinner,
+      createdAt: m.user_prediction.submitted_at,
+      isCorrect: m.status === 'completed'
+        ? (m.user_prediction.winning_team_id === m.winning_team_id)
+        : undefined,
+      points: m.status === 'completed'
+        ? ((m.user_prediction.winning_team_id === m.winning_team_id) ? 10 : 0)
+        : 0,
+    };
+  }
+
   return {
     id: m.id,
     homeTeam: {
@@ -57,6 +80,7 @@ const mapBackendMatchToFrontend = (m: any): Match => {
     homeScore: m.status === 'completed' ? (m.winning_team_id === m.team1_id ? 1 : 0) : undefined,
     awayScore: m.status === 'completed' ? (m.winning_team_id === m.team2_id ? 1 : 0) : undefined,
     rawDate: m.match_date,
+    userPrediction,
   };
 };
 
@@ -78,6 +102,7 @@ const mapBackendPredictionToFrontend = (p: any): Prediction => {
     createdAt: p.submitted_at,
     points: p.is_correct ? 10 : 0,
     isCorrect: p.is_correct ?? undefined,
+    match: match ? mapBackendMatchToFrontend(match) : undefined,
   };
 };
 
@@ -114,26 +139,24 @@ const Dashboard: React.FC = () => {
   const { data: predHistory = [], isLoading: isHistoryLoading } = useQuery({
     queryKey: ['predictionHistory'],
     queryFn: async () => {
-      const rawHistory = await api.getPredictionHistory();
-      return rawHistory.map(mapBackendPredictionToFrontend);
+      const rawHistory = await api.getPredictionHistory(1, 5); // Fetch only 5 recent predictions for dashboard card
+      return ((rawHistory.predictions || []) as any[]).map(mapBackendPredictionToFrontend);
     }
   });
 
   const { data: matchesData, isLoading: isMatchesLoading } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
-      const [rawActive, rawAll] = await Promise.all([
+      const [rawActive, rawUpcoming] = await Promise.all([
         api.getActiveMatches(),
-        api.getMatches()
+        api.getMatches(1, 3, 'upcoming') // Fetch top 3 upcoming matches only
       ]);
       return {
         activeMapped: rawActive.map(mapBackendMatchToFrontend),
-        allMapped: rawAll.map(mapBackendMatchToFrontend)
+        upcomingMapped: (rawUpcoming.matches || []).map(mapBackendMatchToFrontend)
       };
     }
   });
-
-  const matchesList = matchesData?.allMapped || [];
 
   const { data: leaderboardList = [], isLoading: isLeaderboardLoading } = useQuery({
     queryKey: ['leaderboardList'],
@@ -149,8 +172,20 @@ const Dashboard: React.FC = () => {
     if (!selectedMatch && matchesData) {
       if (matchesData.activeMapped.length > 0) {
         setSelectedMatch(matchesData.activeMapped[0]);
-      } else if (matchesData.allMapped.length > 0) {
-        setSelectedMatch(matchesData.allMapped[0]);
+      } else if (matchesData.upcomingMapped.length > 0) {
+        setSelectedMatch(matchesData.upcomingMapped[0]);
+      }
+    }
+  }, [matchesData, selectedMatch]);
+
+  // Keep selectedMatch in sync with fresh matchesData
+  useEffect(() => {
+    if (selectedMatch && matchesData) {
+      const activeMatch = matchesData.activeMapped.find(m => m.id === selectedMatch.id);
+      const upcomingMatch = matchesData.upcomingMapped.find(m => m.id === selectedMatch.id);
+      const freshMatch = activeMatch || upcomingMatch;
+      if (freshMatch && JSON.stringify(freshMatch) !== JSON.stringify(selectedMatch)) {
+        setSelectedMatch(freshMatch);
       }
     }
   }, [matchesData, selectedMatch]);
@@ -165,18 +200,18 @@ const Dashboard: React.FC = () => {
     await api.updatePassword(newPassword);
   };
 
-  // Synchronize prediction and pendingSelection with selectedMatch
+  // Synchronize prediction and pendingSelection with selectedMatch.userPrediction
   useEffect(() => {
     if (!selectedMatch) return;
-    const histPred = predHistory.find(p => p.matchId === selectedMatch.id);
-    if (histPred) {
-      setPrediction(histPred.predictedWinner);
-      setPendingSelection(histPred.predictedWinner);
+    const userPred = selectedMatch.userPrediction;
+    if (userPred) {
+      setPrediction(userPred.predictedWinner);
+      setPendingSelection(userPred.predictedWinner);
     } else {
       setPrediction(null);
       setPendingSelection(null);
     }
-  }, [selectedMatch, predHistory]);
+  }, [selectedMatch]);
 
   useEffect(() => {
     if (!selectedMatch) return;
@@ -204,6 +239,7 @@ const Dashboard: React.FC = () => {
       await api.submitPrediction(matchId, teamId);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['matches'] });
       queryClient.invalidateQueries({ queryKey: ['predictionHistory'] });
       queryClient.invalidateQueries({ queryKey: ['leaderboardList'] });
 
@@ -242,7 +278,7 @@ const Dashboard: React.FC = () => {
     submitPredictionMutation.mutate({ matchId: selectedMatch.id, teamId: predictedTeamId });
   };
 
-  const upcomingMatches = matchesList.filter(m => m.status === 'upcoming').slice(0, 3);
+  const upcomingMatches = matchesData?.upcomingMapped || [];
   const userRank = leaderboardList.find(e => e.userId === userProfile?.id) ||
     leaderboardList.find(e => e.userName === userProfile?.name) ||
     { rank: '-', points: 0, predictions: 0, accuracy: 0 };
@@ -611,7 +647,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="space-y-3">
                   {predHistory.map((pred) => {
-                    const match = matchesList.find(m => m.id === pred.matchId);
+                    const match = pred.match;
                     return (
                       <div key={pred.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
                         <div className="flex items-center gap-3">

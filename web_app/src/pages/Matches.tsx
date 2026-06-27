@@ -29,6 +29,30 @@ const mapBackendMatchToFrontend = (m: any): Match => {
   const dateObj = new Date(m.match_date);
   const dateStr = dateObj.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
   const timeStr = dateObj.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+
+  let userPrediction: Prediction | undefined = undefined;
+  if (m.user_prediction) {
+    let predictedWinner: 'home' | 'away' | 'draw' = 'draw';
+    if (m.user_prediction.winning_team_id === m.team1_id) {
+      predictedWinner = 'home';
+    } else if (m.user_prediction.winning_team_id === m.team2_id) {
+      predictedWinner = 'away';
+    }
+    userPrediction = {
+      id: m.user_prediction.id,
+      matchId: m.id,
+      userId: '',
+      predictedWinner,
+      createdAt: m.user_prediction.submitted_at,
+      isCorrect: m.status === 'completed'
+        ? (m.user_prediction.winning_team_id === m.winning_team_id)
+        : undefined,
+      points: m.status === 'completed'
+        ? ((m.user_prediction.winning_team_id === m.winning_team_id) ? 10 : 0)
+        : 0,
+    };
+  }
+
   return {
     id: m.id,
     homeTeam: {
@@ -57,6 +81,7 @@ const mapBackendMatchToFrontend = (m: any): Match => {
     homeScore: m.status === 'completed' ? (m.winning_team_id === m.team1_id ? 1 : 0) : undefined,
     awayScore: m.status === 'completed' ? (m.winning_team_id === m.team2_id ? 1 : 0) : undefined,
     rawDate: m.match_date,
+    userPrediction,
   };
 };
 
@@ -71,10 +96,11 @@ const mapBackendPredictionToFrontend = (p: any): Prediction => {
     id: p.id,
     matchId: p.match_id,
     userId: p.user_id,
-predictedWinner,
+    predictedWinner,
     createdAt: p.submitted_at,
     points: p.is_correct ? 10 : 0,
     isCorrect: p.is_correct ?? undefined,
+    match: match ? mapBackendMatchToFrontend(match) : undefined,
   };
 };
 
@@ -258,7 +284,18 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, existingPrediction, onPred
   );
 };
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+const getPageNumbers = (current: number, total: number) => {
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | string)[] = [];
+  if (current <= 3) {
+    pages.push(1, 2, 3, 4, '...', total);
+  } else if (current >= total - 2) {
+    pages.push(1, '...', total - 3, total - 2, total - 1, total);
+  } else {
+    pages.push(1, '...', current - 1, current, current + 1, '...', total);
+  }
+  return pages;
+};
 
 const Matches: React.FC = () => {
   const navigate = useNavigate();
@@ -270,37 +307,35 @@ const Matches: React.FC = () => {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const limit = 6;
+
   const { data: userProfile } = useQuery({
     queryKey: ['userProfile'],
     queryFn: () => api.getCurrentUser(),
   });
 
-  const { data: predHistory = [] } = useQuery({
-    queryKey: ['predictionHistory'],
+
+  // Query paginated matches
+  const { data: matchesData, isLoading, isFetching } = useQuery({
+    queryKey: ['userMatchesList', activeTab, page],
     queryFn: async () => {
-      const raw = await api.getPredictionHistory();
-      return raw.map(mapBackendPredictionToFrontend);
+      const raw = await api.getMatches(page, limit, activeTab);
+      return {
+        matches: (raw.matches || []).map(mapBackendMatchToFrontend) as Match[],
+        total: (raw.total || 0) as number,
+        pages: (raw.pages || 0) as number,
+        tabCounts: (raw.tab_counts || {}) as Record<TabKey, number>
+      };
     },
+    placeholderData: (prev) => prev,
   });
 
-  const { data: matchesList = [], isLoading } = useQuery({
-    queryKey: ['allMatchesList'],
-    queryFn: async () => {
-      const raw = await api.getMatches();
-      return raw.map(mapBackendMatchToFrontend);
-    },
-  });
-
-  const { data: activeMatches = [] } = useQuery({
-    queryKey: ['activeMatchesList'],
-    queryFn: async () => {
-      const raw = await api.getActiveMatches();
-      return raw.map(mapBackendMatchToFrontend);
-    },
-    refetchInterval: 60_000,
-  });
-
-  const activeMatchIds = new Set(activeMatches.map((m: Match) => m.id));
+  const matchesList = matchesData?.matches || [];
+  const totalMatches = matchesData?.total || 0;
+  const totalPages = matchesData?.pages || 0;
+  const apiTabCounts = matchesData?.tabCounts;
 
   const { data: leaderboardList = [] } = useQuery({
     queryKey: ['leaderboardList'],
@@ -318,7 +353,7 @@ const Matches: React.FC = () => {
       await api.submitPrediction(matchId, teamId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['predictionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['userMatchesList'] });
       queryClient.invalidateQueries({ queryKey: ['leaderboardList'] });
       const { match, selection } = confirmState!;
       const label = selection === 'home' ? match.homeTeam.shortName
@@ -345,20 +380,13 @@ const Matches: React.FC = () => {
     localStorage.setItem('user', JSON.stringify(updated));
   };
 
-  const isLiveMatch = (m: Match) => activeMatchIds.has(m.id);
-
-  const filtered =
-    activeTab === 'all'       ? matchesList :
-    activeTab === 'live'      ? matchesList.filter(isLiveMatch) :
-    activeTab === 'upcoming'  ? matchesList.filter(m => m.status === 'upcoming' && !isLiveMatch(m)) :
-    activeTab === 'completed' ? matchesList.filter(m => m.status === 'completed') :
-    matchesList;
+  const filtered = matchesList;
 
   const tabCounts: Record<TabKey, number> = {
-    all:       matchesList.length,
-    upcoming:  matchesList.filter(m => m.status === 'upcoming' && !isLiveMatch(m)).length,
-    live:      activeMatches.length,
-    completed: matchesList.filter(m => m.status === 'completed').length,
+    all:       apiTabCounts?.all ?? 0,
+    upcoming:  apiTabCounts?.upcoming ?? 0,
+    live:      apiTabCounts?.live ?? 0,
+    completed: apiTabCounts?.completed ?? 0,
   };
 
   return (
@@ -443,7 +471,10 @@ const Matches: React.FC = () => {
             {TABS.map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => {
+                  setActiveTab(tab.key);
+                  setPage(1);
+                }}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200
                   ${activeTab === tab.key
                     ? 'bg-green-500/20 text-green-400 border-green-500/40 shadow shadow-green-500/10'
@@ -460,38 +491,117 @@ const Matches: React.FC = () => {
             ))}
           </motion.div>
 
-          {/* Match grid */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-24">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                className="w-10 h-10 border-4 border-green-500/30 border-t-green-500 rounded-full"
-              />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-24 text-gray-500">
-              <LayoutList className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">No {activeTab !== 'all' ? activeTab : ''} matches found.</p>
-            </div>
-          ) : (
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
-            >
-              {filtered.map(match => (
-                <MatchCard
-                  key={match.id}
-                  match={match}
-                  existingPrediction={predHistory.find(p => p.matchId === match.id)}
-                  onPredict={(m, s) => setConfirmState({ match: m, selection: s })}
+          {/* Top loader bar */}
+          <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden mb-6 relative">
+            <AnimatePresence>
+              {isFetching && (
+                <motion.div
+                  initial={{ left: '-100%' }}
+                  animate={{ left: '100%' }}
+                  transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+                  className="absolute top-0 bottom-0 w-1/3 bg-gradient-to-r from-transparent via-green-500 to-transparent shadow-[0_0_8px_rgba(34,197,94,0.5)]"
                 />
-              ))}
-            </motion.div>
-          )}
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Match grid with snatch transition */}
+          <div className={`transition-opacity duration-300 ${isFetching ? 'opacity-85' : 'opacity-100'}`}>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-24">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                  className="w-10 h-10 border-4 border-green-500/30 border-t-green-500 rounded-full"
+                />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-24 text-gray-500">
+                <LayoutList className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">No {activeTab !== 'all' ? activeTab : ''} matches found.</p>
+              </div>
+            ) : (
+              <>
+                <motion.div
+                  key={`${activeTab}-${page}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+                >
+                  {filtered.map(match => (
+                    <MatchCard
+                      key={match.id}
+                      match={match}
+                      existingPrediction={match.userPrediction}
+                      onPredict={(m, s) => setConfirmState({ match: m, selection: s })}
+                    />
+                  ))}
+                </motion.div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-white/10 w-full">
+                    <p className="text-xs text-gray-400">
+                      Showing <span className="font-semibold text-white">{((page - 1) * limit) + 1}</span> to{' '}
+                      <span className="font-semibold text-white">
+                        {Math.min(page * limit, totalMatches)}
+                      </span>{' '}
+                      of <span className="font-semibold text-white">{totalMatches}</span> matches
+                    </p>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={page === 1}
+                        onClick={() => setPage(p => Math.max(p - 1, 1))}
+                        className="text-gray-400 hover:text-white hover:bg-white/5 border border-white/10 h-9 px-3 rounded-xl disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
+                      >
+                        Previous
+                      </Button>
+                      
+                      <div className="flex items-center gap-1.5">
+                        {getPageNumbers(page, totalPages).map((pageNum, idx) => {
+                          if (pageNum === '...') {
+                            return (
+                              <span key={`dots-${idx}`} className="w-9 h-9 flex items-center justify-center text-gray-500 text-xs">
+                                ...
+                              </span>
+                            );
+                          }
+                          const isSelected = pageNum === page;
+                          return (
+                            <button
+                              key={`page-${pageNum}`}
+                              onClick={() => setPage(pageNum as number)}
+                              className={`w-9 h-9 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center justify-center
+                                ${isSelected
+                                  ? 'bg-green-500/20 text-green-400 border-green-500/40 shadow shadow-green-500/10'
+                                  : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-white'
+                                }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={page === totalPages}
+                        onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                        className="text-gray-400 hover:text-white hover:bg-white/5 border border-white/10 h-9 px-3 rounded-xl disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </main>
 
         {/* Confirm prediction dialog */}

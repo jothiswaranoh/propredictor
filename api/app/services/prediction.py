@@ -1,12 +1,12 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 from bson import ObjectId
 from app.models.prediction import UserPrediction
 from app.repositories.prediction import PredictionRepository
 from app.repositories.match import MatchRepository
 from app.repositories.team import TeamRepository
 from app.repositories.user import UserRepository
-from app.schemas.prediction import PredictionSubmit, PredictionDetailResponse
+from app.schemas.prediction import PredictionSubmit, PredictionDetailResponse, PredictionPaginatedResponse
 from app.exceptions import NotFoundException, BadRequestException, ConflictException
 
 class PredictionService:
@@ -51,22 +51,72 @@ class PredictionService:
         }
         return await self.prediction_repo.create(pred_dict)
 
-    async def get_user_prediction_history(self, user_id: str, match_service) -> List[PredictionDetailResponse]:
-        predictions = await self.prediction_repo.get_by_user(user_id)
+    async def get_user_prediction_history(
+        self,
+        user_id: str,
+        match_service,
+        page: Optional[int] = None,
+        limit: Optional[int] = 20
+    ) -> Union[dict, List[PredictionDetailResponse]]:
+        u_id = self.prediction_repo._to_object_id(user_id)
+        if page is not None:
+            predictions, total = await self.prediction_repo.get_paginated(
+                filter_query={"user_id": u_id},
+                sort_by="submitted_at",
+                descending=True,
+                page=page,
+                limit=limit
+            )
+        else:
+            predictions = await self.prediction_repo.get_by_user(user_id)
+            total = len(predictions)
+
         user = await self.user_repo.get_by_id(user_id)
         user_name = user.name if user else "Unknown User"
+
+        if not predictions:
+            if page is not None:
+                import math
+                return {
+                    "predictions": [],
+                    "total": total,
+                    "page": page,
+                    "limit": limit,
+                    "pages": math.ceil(total / limit) if limit > 0 else 0
+                }
+            return []
+
+        # Bulk fetch matches
+        match_ids = list({p.match_id for p in predictions})
+        matches = await self.match_repo.get_all(
+            filter_query={"_id": {"$in": [self.prediction_repo._to_object_id(mid) for mid in match_ids]}}
+        )
+        match_map = {str(m.id): m for m in matches}
+
+        # Bulk fetch teams for these matches to optimize N+1 queries
+        team_ids = set()
+        for m in matches:
+            team_ids.add(str(m.team1_id))
+            team_ids.add(str(m.team2_id))
+
+        teams_map = {}
+        if team_ids:
+            team_obj_ids = [self.team_repo._to_object_id(tid) for tid in team_ids]
+            teams = await self.team_repo.get_all(filter_query={"_id": {"$in": team_obj_ids}})
+            teams_map = {str(t.id): t for t in teams}
+
         detailed_preds = []
         for p in predictions:
-            match = await self.match_repo.get_by_id(p.match_id)
+            match = match_map.get(str(p.match_id))
             if not match:
                 continue
-                
+
             is_correct = None
             if match.status == "completed":
                 is_correct = (p.winning_team_id == match.winning_team_id)
-                
-            match_detail = await match_service.get_match_detail(match)
-            
+
+            match_detail = await match_service.get_match_detail(match, teams_map=teams_map)
+
             detailed_preds.append(
                 PredictionDetailResponse(
                     id=str(p.id),
@@ -79,6 +129,16 @@ class PredictionService:
                     is_correct=is_correct
                 )
             )
+
+        if page is not None:
+            import math
+            return {
+                "predictions": detailed_preds,
+                "total": total,
+                "page": page,
+                "limit": limit,
+                "pages": math.ceil(total / limit) if limit > 0 else 0
+            }
         return detailed_preds
 
     async def get_all_predictions_detailed(self, match_service) -> List[PredictionDetailResponse]:

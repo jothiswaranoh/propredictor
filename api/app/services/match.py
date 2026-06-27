@@ -19,9 +19,13 @@ class MatchService:
             raise NotFoundException("Match not found")
         return match
 
-    async def get_match_detail(self, match: Match, user_prediction: Optional[dict] = None) -> MatchDetailResponse:
-        team1 = await self.team_repo.get_by_id(match.team1_id)
-        team2 = await self.team_repo.get_by_id(match.team2_id)
+    async def get_match_detail(self, match: Match, user_prediction: Optional[dict] = None, teams_map: Optional[dict] = None) -> MatchDetailResponse:
+        if teams_map is not None:
+            team1 = teams_map.get(str(match.team1_id))
+            team2 = teams_map.get(str(match.team2_id))
+        else:
+            team1 = await self.team_repo.get_by_id(match.team1_id)
+            team2 = await self.team_repo.get_by_id(match.team2_id)
         
         team1_resp = TeamResponse.model_validate(team1) if team1 else None
         team2_resp = TeamResponse.model_validate(team2) if team2 else None
@@ -43,17 +47,41 @@ class MatchService:
 
     async def get_all_matches_detailed(self) -> List[MatchDetailResponse]:
         matches = await self.match_repo.get_all(sort_by="match_date")
+        
+        team_ids = set()
+        for m in matches:
+            team_ids.add(str(m.team1_id))
+            team_ids.add(str(m.team2_id))
+            
+        teams_map = {}
+        if team_ids:
+            team_obj_ids = [self.team_repo._to_object_id(tid) for tid in team_ids]
+            teams = await self.team_repo.get_all(filter_query={"_id": {"$in": team_obj_ids}})
+            teams_map = {str(t.id): t for t in teams}
+            
         detailed_matches = []
         for m in matches:
-            detailed = await self.get_match_detail(m)
+            detailed = await self.get_match_detail(m, teams_map=teams_map)
             detailed_matches.append(detailed)
         return detailed_matches
 
     async def get_active_matches_detailed(self) -> List[MatchDetailResponse]:
         matches = await self.match_repo.get_active_matches()
+        
+        team_ids = set()
+        for m in matches:
+            team_ids.add(str(m.team1_id))
+            team_ids.add(str(m.team2_id))
+            
+        teams_map = {}
+        if team_ids:
+            team_obj_ids = [self.team_repo._to_object_id(tid) for tid in team_ids]
+            teams = await self.team_repo.get_all(filter_query={"_id": {"$in": team_obj_ids}})
+            teams_map = {str(t.id): t for t in teams}
+            
         detailed_matches = []
         for m in matches:
-            detailed = await self.get_match_detail(m)
+            detailed = await self.get_match_detail(m, teams_map=teams_map)
             detailed_matches.append(detailed)
         return detailed_matches
 
@@ -142,7 +170,8 @@ class MatchService:
         search: Optional[str] = None,
         status: Optional[str] = None,
         team_id: Optional[str] = None,
-        date: Optional[str] = None
+        date: Optional[str] = None,
+        user_side: bool = False
     ) -> dict:
         search_filter = None
         if search:
@@ -164,7 +193,26 @@ class MatchService:
                 
         status_filter = None
         if status and status != "all":
-            status_filter = {"status": status}
+            if user_side:
+                now = datetime.utcnow()
+                if status == "live":
+                    status_filter = {
+                        "prediction_open_time": {"$lte": now},
+                        "prediction_close_time": {"$gte": now},
+                        "status": {"$ne": "completed"}
+                    }
+                elif status == "upcoming":
+                    status_filter = {
+                        "status": "upcoming",
+                        "$or": [
+                            {"prediction_open_time": {"$gt": now}},
+                            {"prediction_close_time": {"$lt": now}}
+                        ]
+                    }
+                elif status == "completed":
+                    status_filter = {"status": "completed"}
+            else:
+                status_filter = {"status": status}
 
         team_filter = None
         if team_id and team_id != "all":
@@ -211,16 +259,54 @@ class MatchService:
             limit=limit
         )
         
+        # Batch query teams to prevent N+1 queries
+        team_ids = set()
+        for m in matches:
+            team_ids.add(str(m.team1_id))
+            team_ids.add(str(m.team2_id))
+            
+        teams_map = {}
+        if team_ids:
+            team_obj_ids = [self.team_repo._to_object_id(tid) for tid in team_ids]
+            teams = await self.team_repo.get_all(filter_query={"_id": {"$in": team_obj_ids}})
+            teams_map = {str(t.id): t for t in teams}
+            
         detailed_matches = []
         for m in matches:
-            detailed = await self.get_match_detail(m)
+            detailed = await self.get_match_detail(m, teams_map=teams_map)
             detailed_matches.append(detailed)
             
         pages = (total + limit - 1) // limit if limit > 0 else 0
+        
+        tab_counts = None
+        if user_side:
+            now = datetime.utcnow()
+            completed_count = await self.match_repo.collection.count_documents({"status": "completed"})
+            live_count = await self.match_repo.collection.count_documents({
+                "prediction_open_time": {"$lte": now},
+                "prediction_close_time": {"$gte": now},
+                "status": {"$ne": "completed"}
+            })
+            upcoming_count = await self.match_repo.collection.count_documents({
+                "status": "upcoming",
+                "$or": [
+                    {"prediction_open_time": {"$gt": now}},
+                    {"prediction_close_time": {"$lt": now}}
+                ]
+            })
+            all_count = await self.match_repo.collection.count_documents({})
+            tab_counts = {
+                "all": all_count,
+                "live": live_count,
+                "upcoming": upcoming_count,
+                "completed": completed_count
+            }
+            
         return {
             "matches": detailed_matches,
             "total": total,
             "page": page,
             "limit": limit,
-            "pages": pages
+            "pages": pages,
+            "tab_counts": tab_counts
         }

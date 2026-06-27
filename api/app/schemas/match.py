@@ -85,3 +85,4 @@ class MatchPaginatedResponse(BaseModel):
     page: int
     limit: int
     pages: int
+    tab_counts: Optional[dict] = None

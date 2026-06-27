@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Path, Query, HTTPException
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime
 from app.models.user import User
 from app.schemas.user import UserResponse, PublicUserProfileResponse
-from app.schemas.match import MatchDetailResponse
-from app.schemas.prediction import PredictionSubmit, PredictionResponse, PredictionDetailResponse
+from app.schemas.match import MatchDetailResponse, MatchPaginatedResponse
+from app.schemas.prediction import PredictionSubmit, PredictionResponse, PredictionDetailResponse, PredictionPaginatedResponse
 from app.schemas.leaderboard import LeaderboardResponse
 from app.dependencies import (
     get_current_user,
@@ -63,25 +63,59 @@ async def update_my_password(
     updated_user = await user_repo.update(str(current_user.id), {"password": password_data.new_password})
     return updated_user
 
-@router.get("/api/matches", response_model=List[MatchDetailResponse])
+@router.get("/api/matches", response_model=Union[MatchPaginatedResponse, List[MatchDetailResponse]])
 async def list_matches(
+    page: Optional[int] = Query(None, ge=1),
+    limit: Optional[int] = Query(20, ge=1),
+    status: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     match_service: MatchService = Depends(get_match_service),
     prediction_repo = Depends(get_prediction_repo)
 ):
     """
     List all matches with team details and embed the user's prediction (if submitted).
+    Supports pagination when `page` parameter is provided.
     """
-    matches = await match_service.get_all_matches_detailed()
-    for m in matches:
-        pred = await prediction_repo.get_by_user_and_match(current_user.id, m.id)
-        if pred:
-            m.user_prediction = {
-                "id": str(pred.id),
-                "winning_team_id": str(pred.winning_team_id) if pred.winning_team_id is not None else None,
-                "submitted_at": pred.submitted_at.isoformat()
-            }
-    return matches
+    if page is not None:
+        paginated = await match_service.get_paginated_matches_detailed(
+            page=page,
+            limit=limit,
+            status=status,
+            user_side=True
+        )
+        matches = paginated["matches"]
+        
+        # Optimize N+1 queries by fetching predictions in bulk
+        match_ids = [m.id for m in matches]
+        predictions = await prediction_repo.get_by_user_and_matches(current_user.id, match_ids)
+        pred_map = {str(p.match_id): p for p in predictions}
+        
+        for m in matches:
+            pred = pred_map.get(m.id)
+            if pred:
+                m.user_prediction = {
+                    "id": str(pred.id),
+                    "winning_team_id": str(pred.winning_team_id) if pred.winning_team_id is not None else None,
+                    "submitted_at": pred.submitted_at.isoformat()
+                }
+        return paginated
+    else:
+        matches = await match_service.get_all_matches_detailed()
+        
+        # Optimize N+1 queries by fetching predictions in bulk
+        match_ids = [m.id for m in matches]
+        predictions = await prediction_repo.get_by_user_and_matches(current_user.id, match_ids)
+        pred_map = {str(p.match_id): p for p in predictions}
+        
+        for m in matches:
+            pred = pred_map.get(m.id)
+            if pred:
+                m.user_prediction = {
+                    "id": str(pred.id),
+                    "winning_team_id": str(pred.winning_team_id) if pred.winning_team_id is not None else None,
+                    "submitted_at": pred.submitted_at.isoformat()
+                }
+        return matches
 
 @router.get("/api/matches/active", response_model=List[MatchDetailResponse])
 async def list_active_matches(
@@ -93,8 +127,14 @@ async def list_active_matches(
     List matches whose prediction window is currently active.
     """
     matches = await match_service.get_active_matches_detailed()
+    
+    # Optimize N+1 queries by fetching predictions in bulk
+    match_ids = [m.id for m in matches]
+    predictions = await prediction_repo.get_by_user_and_matches(current_user.id, match_ids)
+    pred_map = {str(p.match_id): p for p in predictions}
+    
     for m in matches:
-        pred = await prediction_repo.get_by_user_and_match(current_user.id, m.id)
+        pred = pred_map.get(m.id)
         if pred:
             m.user_prediction = {
                 "id": str(pred.id),
@@ -121,8 +161,10 @@ async def submit_prediction(
     )
     return prediction
 
-@router.get("/api/predictions/history", response_model=List[PredictionDetailResponse])
+@router.get("/api/predictions/history", response_model=Union[PredictionPaginatedResponse, List[PredictionDetailResponse]])
 async def get_prediction_history(
+    page: Optional[int] = Query(None, ge=1),
+    limit: Optional[int] = Query(20, ge=1),
     current_user: User = Depends(get_current_user),
     prediction_service: PredictionService = Depends(get_prediction_service),
     match_service: MatchService = Depends(get_match_service)
@@ -132,7 +174,9 @@ async def get_prediction_history(
     """
     return await prediction_service.get_user_prediction_history(
         user_id=current_user.id,
-        match_service=match_service
+        match_service=match_service,
+        page=page,
+        limit=limit
     )
 
 @router.get("/api/leaderboard", response_model=LeaderboardResponse)

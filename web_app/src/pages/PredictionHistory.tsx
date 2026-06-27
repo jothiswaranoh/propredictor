@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +15,29 @@ const mapBackendMatchToFrontend = (m: any): Match => {
   const dateObj = new Date(m.match_date);
   const dateStr = dateObj.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
   const timeStr = dateObj.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+
+  let userPrediction: Prediction | undefined = undefined;
+  if (m.user_prediction) {
+    let predictedWinner: 'home' | 'away' | 'draw' = 'draw';
+    if (m.user_prediction.winning_team_id === m.team1_id) {
+      predictedWinner = 'home';
+    } else if (m.user_prediction.winning_team_id === m.team2_id) {
+      predictedWinner = 'away';
+    }
+    userPrediction = {
+      id: m.user_prediction.id,
+      matchId: m.id,
+      userId: '',
+      predictedWinner,
+      createdAt: m.user_prediction.submitted_at,
+      isCorrect: m.status === 'completed'
+        ? (m.user_prediction.winning_team_id === m.winning_team_id)
+        : undefined,
+      points: m.status === 'completed'
+        ? ((m.user_prediction.winning_team_id === m.winning_team_id) ? 10 : 0)
+        : 0,
+    };
+  }
 
   return {
     id: m.id,
@@ -44,6 +67,7 @@ const mapBackendMatchToFrontend = (m: any): Match => {
     homeScore: m.status === 'completed' ? (m.winning_team_id === m.team1_id ? 1 : 0) : undefined,
     awayScore: m.status === 'completed' ? (m.winning_team_id === m.team2_id ? 1 : 0) : undefined,
     rawDate: m.match_date,
+    userPrediction,
   };
 };
 
@@ -65,41 +89,57 @@ const mapBackendPredictionToFrontend = (p: any): Prediction => {
     createdAt: p.submitted_at,
     points: p.is_correct ? 10 : 0,
     isCorrect: p.is_correct ?? undefined,
+    match: match ? mapBackendMatchToFrontend(match) : undefined,
   };
+};
+
+const getPageNumbers = (current: number, total: number) => {
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | string)[] = [];
+  if (current <= 3) {
+    pages.push(1, 2, 3, 4, '...', total);
+  } else if (current >= total - 2) {
+    pages.push(1, '...', total - 3, total - 2, total - 1, total);
+  } else {
+    pages.push(1, '...', current - 1, current, current + 1, '...', total);
+  }
+  return pages;
 };
 
 const PredictionHistory: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { data: predHistory = [], isLoading: isLoadingHistory, error: historyError } = useQuery({
-    queryKey: ['predictionHistory'],
+
+  const [page, setPage] = useState(1);
+  const limit = 8;
+
+  const { data: historyData, isLoading: isLoadingHistory, error: historyError } = useQuery({
+    queryKey: ['predictionHistory', page],
     queryFn: async () => {
-      const rawHistory = await api.getPredictionHistory();
-      return rawHistory.map(mapBackendPredictionToFrontend);
+      const rawHistory = await api.getPredictionHistory(page, limit);
+      return {
+        predictions: (rawHistory.predictions || []).map(mapBackendPredictionToFrontend) as Prediction[],
+        total: (rawHistory.total || 0) as number,
+        pages: (rawHistory.pages || 0) as number,
+      };
     }
   });
 
-  const { data: matchesList = [], isLoading: isLoadingMatches, error: matchesError } = useQuery({
-    queryKey: ['matchesList'],
-    queryFn: async () => {
-      const rawAll = await api.getMatches();
-      return rawAll.map(mapBackendMatchToFrontend);
-    }
-  });
-
-  const loading = isLoadingHistory || isLoadingMatches;
+  const predHistory = historyData?.predictions || [];
+  const totalPages = historyData?.pages || 0;
+  const totalPredictions = historyData?.total || 0;
 
   useEffect(() => {
-    if (historyError || matchesError) {
+    if (historyError) {
       toast({
-        title: "Error loading data",
-        description: (historyError as any)?.message || (matchesError as any)?.message || "Failed to load prediction history.",
+        title: "Error loading prediction history",
+        description: (historyError as any)?.message || "Failed to load data.",
         variant: "destructive",
       });
     }
-  }, [historyError, matchesError, toast]);
+  }, [historyError, toast]);
 
-  if (loading) {
+  if (isLoadingHistory) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -165,67 +205,130 @@ const PredictionHistory: React.FC = () => {
                   No predictions made yet.
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {predHistory.map((pred, idx) => {
-                    const match = matchesList.find(m => m.id === pred.matchId);
-                    if (!match) return null;
+                <>
+                  <div className="space-y-4">
+                    {predHistory.map((pred, idx) => {
+                      const match = pred.match;
+                      if (!match) return null;
 
-                    return (
-                      <motion.div
-                        key={pred.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors gap-4"
-                      >
-                        <div className="flex items-center gap-4 w-full sm:w-auto">
-                          <div className="flex -space-x-3">
-                            <img src={match.homeTeam.logo} alt="" className="w-10 h-10 rounded-full bg-gray-800 p-1 border-2 border-gray-900 z-10" />
-                            <img src={match.awayTeam.logo} alt="" className="w-10 h-10 rounded-full bg-gray-800 p-1 border-2 border-gray-900" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-0">
-                                {match.competition}
-                              </Badge>
-                              <span className="text-xs text-gray-400">{match.date}</span>
+                      return (
+                        <motion.div
+                          key={pred.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                          className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors gap-4"
+                        >
+                          <div className="flex items-center gap-4 w-full sm:w-auto">
+                            <div className="flex -space-x-3">
+                              <img src={match.homeTeam.logo} alt="" className="w-10 h-10 rounded-full bg-gray-800 p-1 border-2 border-gray-900 z-10" />
+                              <img src={match.awayTeam.logo} alt="" className="w-10 h-10 rounded-full bg-gray-800 p-1 border-2 border-gray-900" />
                             </div>
-                            <p className="text-base font-semibold text-gray-200">
-                              {match.homeTeam.shortName} vs {match.awayTeam.shortName}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between w-full sm:w-auto gap-6 sm:gap-8 bg-gray-900/50 p-3 rounded-lg sm:bg-transparent sm:p-0">
-                          <div className="flex flex-col items-start sm:items-end">
-                            <span className="text-xs text-gray-500 mb-1">Your Pick</span>
-                            <span className="text-sm font-medium text-white flex items-center gap-1">
-                              {pred.predictedWinner === 'home'
-                                ? match.homeTeam.shortName
-                                : pred.predictedWinner === 'away'
-                                  ? match.awayTeam.shortName
-                                  : 'Draw'}
-                              <CheckCircle2 className="w-3 h-3 text-green-400" />
-                            </span>
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-0">
+                                  {match.competition}
+                                </Badge>
+                                <span className="text-xs text-gray-400">{match.date}</span>
+                              </div>
+                              <p className="text-base font-semibold text-gray-200">
+                                {match.homeTeam.shortName} vs {match.awayTeam.shortName}
+                              </p>
+                            </div>
                           </div>
 
-                          <div className="flex flex-col items-end">
-                            <span className="text-xs text-gray-500 mb-1">Status</span>
-                            {pred.isCorrect === undefined ? (
-                              <Badge className="bg-gray-500/20 text-gray-400 border border-gray-500/30">
-                                Pending
-                              </Badge>
-                            ) : (
-                              <Badge className={pred.isCorrect ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}>
-                                {pred.isCorrect ? '+10 Pts' : '0 Pts'}
-                              </Badge>
-                            )}
+                          <div className="flex items-center justify-between w-full sm:w-auto gap-6 sm:gap-8 bg-gray-900/50 p-3 rounded-lg sm:bg-transparent sm:p-0">
+                            <div className="flex flex-col items-start sm:items-end">
+                              <span className="text-xs text-gray-500 mb-1">Your Pick</span>
+                              <span className="text-sm font-medium text-white flex items-center gap-1">
+                                {pred.predictedWinner === 'home'
+                                  ? match.homeTeam.shortName
+                                  : pred.predictedWinner === 'away'
+                                    ? match.awayTeam.shortName
+                                    : 'Draw'}
+                                <CheckCircle2 className="w-3 h-3 text-green-400" />
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col items-end">
+                              <span className="text-xs text-gray-500 mb-1">Status</span>
+                              {pred.isCorrect === undefined ? (
+                                <Badge className="bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                                  Pending
+                                </Badge>
+                              ) : (
+                                <Badge className={pred.isCorrect ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}>
+                                  {pred.isCorrect ? '+10 Pts' : '0 Pts'}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-white/10 w-full">
+                      <p className="text-xs text-gray-400">
+                        Showing <span className="font-semibold text-white">{((page - 1) * limit) + 1}</span> to{' '}
+                        <span className="font-semibold text-white">
+                          {Math.min(page * limit, totalPredictions)}
+                        </span>{' '}
+                        of <span className="font-semibold text-white">{totalPredictions}</span> predictions
+                      </p>
+                      
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={page === 1}
+                          onClick={() => setPage(p => Math.max(p - 1, 1))}
+                          className="text-gray-400 hover:text-white hover:bg-white/5 border border-white/10 h-9 px-3 rounded-xl disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
+                        >
+                          Previous
+                        </Button>
+                        
+                        <div className="flex items-center gap-1.5">
+                          {getPageNumbers(page, totalPages).map((pageNum, idx) => {
+                            if (pageNum === '...') {
+                              return (
+                                <span key={`dots-${idx}`} className="w-9 h-9 flex items-center justify-center text-gray-500 text-xs">
+                                  ...
+                                </span>
+                              );
+                            }
+                            const isSelected = pageNum === page;
+                            return (
+                              <button
+                                key={`page-${pageNum}`}
+                                onClick={() => setPage(pageNum as number)}
+                                className={`w-9 h-9 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center justify-center
+                                  ${isSelected
+                                    ? 'bg-green-500/20 text-green-400 border-green-500/40 shadow shadow-green-500/10'
+                                    : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-white'
+                                  }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
                         </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={page === totalPages}
+                          onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                          className="text-gray-400 hover:text-white hover:bg-white/5 border border-white/10 h-9 px-3 rounded-xl disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </Card>
           </motion.div>

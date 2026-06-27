@@ -16,3 +16,8 @@ class PredictionRepository(BaseRepository[UserPrediction]):
     async def get_by_user(self, user_id: str) -> List[UserPrediction]:
         u_id = self._to_object_id(user_id)
         return await self.get_all(filter_query={"user_id": u_id}, sort_by="submitted_at", descending=True)
+
+    async def get_by_user_and_matches(self, user_id: str, match_ids: List[str]) -> List[UserPrediction]:
+        u_id = self._to_object_id(user_id)
+        m_ids = [self._to_object_id(mid) for mid in match_ids]
+        return await self.get_all(filter_query={"user_id": u_id, "match_id": {"$in": m_ids}})

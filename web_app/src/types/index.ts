@@ -29,6 +29,7 @@ export interface Match {
   homeScore?: number;
   awayScore?: number;
   rawDate: string;
+  userPrediction?: Prediction;
 }
 
 export interface Prediction {
@@ -39,6 +40,7 @@ export interface Prediction {
   createdAt: string;
   points?: number;
   isCorrect?: boolean;
+  match?: Match;
 }
 
 export interface LeaderboardEntry {
