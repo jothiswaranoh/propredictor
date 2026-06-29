@@ -26,7 +26,6 @@ class UserResponse(BaseModel):
     id: str
     name: str
     username: str
-    password: str
     role: str
     active: bool
     avatar: Optional[str] = None

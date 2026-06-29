@@ -6,6 +6,7 @@ from app.exceptions import AuthException
 from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.user import UserCreate
+from app.utils.security import hash_password, verify_password
 
 class AuthService:
     def __init__(self, user_repo: UserRepository):
@@ -17,14 +18,26 @@ class AuthService:
             raise AuthException("Username already registered")
         
         user_dict = user_data.model_dump()
+        user_dict["password"] = hash_password(user_dict["password"])
         user_dict["created_at"] = datetime.utcnow()
         user = await self.user_repo.create(user_dict)
         return user
 
     async def authenticate_user(self, username: str, password: str) -> User:
-        user = await self.user_repo.get_by_username_and_password(username, password)
+        user = await self.user_repo.get_by_username(username)
         if not user:
             raise AuthException("Invalid username or password")
+            
+        is_valid, needs_rehash = verify_password(password, user.password)
+        if not is_valid:
+            raise AuthException("Invalid username or password")
+            
+        if needs_rehash:
+            # Hash the password and update in the database
+            hashed_password = hash_password(password)
+            await self.user_repo.update(str(user.id), {"password": hashed_password})
+            # Also update the in-memory user object if needed later in the flow
+            user.password = hashed_password
         if not user.active:
             raise AuthException("User account is inactive")
         return user
