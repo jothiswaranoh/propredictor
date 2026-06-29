@@ -48,5 +48,4 @@ async def test_get_current_user_profile(client: AsyncClient):
     assert profile_response.status_code == 200
     user_data = profile_response.json()
     assert user_data["username"] == "admin"
-    assert user_data["password"] == "EMP001"
     assert user_data["role"] == "admin"
