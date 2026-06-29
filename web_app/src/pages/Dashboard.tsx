@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Trophy, Clock, TrendingUp, ChevronRight,
-  LogOut, User, Target, Flame, Crown, ArrowUpRight, CheckCircle2,
+  LogOut, User, Target, Flame, Crown, ArrowUpRight, CheckCircle2, RefreshCw,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -136,25 +136,27 @@ const Dashboard: React.FC = () => {
     queryFn: () => api.getCurrentUser(),
   });
 
-  const { data: predHistory = [], isLoading: isHistoryLoading } = useQuery({
+  const { data: predHistory = [], isLoading: isHistoryLoading } = useQuery<Prediction[]>({
     queryKey: ['predictionHistory'],
     queryFn: async () => {
-      const rawHistory = await api.getPredictionHistory(1, 5); // Fetch only 5 recent predictions for dashboard card
+      const rawHistory = await api.getPredictionHistory(1, 6); // Fetch only 6 recent predictions for dashboard card
       return ((rawHistory.predictions || []) as any[]).map(mapBackendPredictionToFrontend);
     }
   });
 
-  const { data: matchesData, isLoading: isMatchesLoading } = useQuery({
-    queryKey: ['matches'],
+  const { data: activeMatches = [], isLoading: isActiveMatchesLoading } = useQuery<Match[]>({
+    queryKey: ['activeMatches'],
     queryFn: async () => {
-      const [rawActive, rawUpcoming] = await Promise.all([
-        api.getActiveMatches(),
-        api.getMatches(1, 3, 'upcoming') // Fetch top 3 upcoming matches only
-      ]);
-      return {
-        activeMapped: rawActive.map(mapBackendMatchToFrontend),
-        upcomingMapped: (rawUpcoming.matches || []).map(mapBackendMatchToFrontend)
-      };
+      const rawActive = await api.getActiveMatches();
+      return rawActive.map(mapBackendMatchToFrontend);
+    }
+  });
+
+  const { data: upcomingMatches = [], isLoading: isUpcomingMatchesLoading } = useQuery<Match[]>({
+    queryKey: ['upcomingMatches'],
+    queryFn: async () => {
+      const rawUpcoming = await api.getMatches(1, 6, 'upcoming'); // Fetch top 6 upcoming matches only
+      return (rawUpcoming.matches || []).map(mapBackendMatchToFrontend);
     }
   });
 
@@ -166,29 +168,29 @@ const Dashboard: React.FC = () => {
     }
   });
 
-  const loading = isProfileLoading || isHistoryLoading || isMatchesLoading || isLeaderboardLoading;
+  const loading = isProfileLoading;
 
   useEffect(() => {
-    if (!selectedMatch && matchesData) {
-      if (matchesData.activeMapped.length > 0) {
-        setSelectedMatch(matchesData.activeMapped[0]);
-      } else if (matchesData.upcomingMapped.length > 0) {
-        setSelectedMatch(matchesData.upcomingMapped[0]);
+    if (!selectedMatch && (!isActiveMatchesLoading || !isUpcomingMatchesLoading)) {
+      if (activeMatches.length > 0) {
+        setSelectedMatch(activeMatches[0]);
+      } else if (upcomingMatches.length > 0) {
+        setSelectedMatch(upcomingMatches[0]);
       }
     }
-  }, [matchesData, selectedMatch]);
+  }, [activeMatches, upcomingMatches, selectedMatch, isActiveMatchesLoading, isUpcomingMatchesLoading]);
 
-  // Keep selectedMatch in sync with fresh matchesData
+  // Keep selectedMatch in sync with fresh activeMatches/upcomingMatches
   useEffect(() => {
-    if (selectedMatch && matchesData) {
-      const activeMatch = matchesData.activeMapped.find(m => m.id === selectedMatch.id);
-      const upcomingMatch = matchesData.upcomingMapped.find(m => m.id === selectedMatch.id);
+    if (selectedMatch) {
+      const activeMatch = activeMatches.find((m: Match) => m.id === selectedMatch.id);
+      const upcomingMatch = upcomingMatches.find((m: Match) => m.id === selectedMatch.id);
       const freshMatch = activeMatch || upcomingMatch;
       if (freshMatch && JSON.stringify(freshMatch) !== JSON.stringify(selectedMatch)) {
         setSelectedMatch(freshMatch);
       }
     }
-  }, [matchesData, selectedMatch]);
+  }, [activeMatches, upcomingMatches, selectedMatch]);
 
   const handleUpdateProfile = async (newName: string, avatar?: string) => {
     const updatedUser = await api.updateProfile(newName, avatar);
@@ -239,7 +241,8 @@ const Dashboard: React.FC = () => {
       await api.submitPrediction(matchId, teamId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['matches'] });
+      queryClient.invalidateQueries({ queryKey: ['activeMatches'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingMatches'] });
       queryClient.invalidateQueries({ queryKey: ['predictionHistory'] });
       queryClient.invalidateQueries({ queryKey: ['leaderboardList'] });
 
@@ -278,7 +281,7 @@ const Dashboard: React.FC = () => {
     submitPredictionMutation.mutate({ matchId: selectedMatch.id, teamId: predictedTeamId });
   };
 
-  const upcomingMatches = matchesData?.upcomingMapped || [];
+  // upcomingMatches is loaded directly from query
   const userRank = leaderboardList.find(e => e.userId === userProfile?.id) ||
     leaderboardList.find(e => e.userName === userProfile?.name) ||
     { rank: '-', points: 0, predictions: 0, accuracy: 0 };
@@ -373,155 +376,179 @@ const Dashboard: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             className="mb-10"
           >
-            <div className="glass-card-strong rounded-3xl overflow-hidden">
-              <div className="bg-gradient-to-r from-green-600/10 via-transparent to-blue-600/10 p-1">
-                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-3xl p-6 md:p-10">
+            {isActiveMatchesLoading || isUpcomingMatchesLoading ? (
+              <div className="glass-card-strong rounded-3xl overflow-hidden animate-pulse">
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 p-6 md:p-10">
                   <div className="flex flex-col lg:flex-row items-center gap-8">
-                    <div className="flex-1 text-center lg:text-left">
-                      <Badge className="mb-4 bg-green-500/10 text-green-400 border-green-500/30">
-                        <span className="pulse-dot inline-block w-2 h-2 rounded-full bg-green-400 mr-2" />
-                        LIVE PREDICTIONS OPEN
-                      </Badge>
-                      <h2 className="text-2xl md:text-3xl font-bold mb-2 text-white">
-                        {selectedMatch?.competition}
-                      </h2>
-                      {/* <p className="text-gray-400 mb-6">{selectedMatch?.venue}</p> */}
-
-                      <div className="flex justify-center lg:justify-start gap-3 mb-6">
-                        {[
-                          { value: countdown.days, label: 'Days' },
-                          { value: countdown.hours, label: 'Hours' },
-                          { value: countdown.minutes, label: 'Min' },
-                          { value: countdown.seconds, label: 'Sec' },
-                        ].map((item, idx) => (
-                          <motion.div
-                            key={idx}
-                            initial={{ scale: 0.9 }}
-                            animate={{ scale: 1 }}
-                            className="countdown-segment rounded-xl p-3 min-w-[60px] text-center"
-                          >
-                            <div className="text-2xl md:text-3xl font-bold text-gradient">
-                              {String(item.value).padStart(2, '0')}
-                            </div>
-                            <div className="text-xs text-gray-500">{item.label}</div>
-                          </motion.div>
+                    <div className="flex-1 text-center lg:text-left space-y-4">
+                      <div className="w-32 h-6 bg-white/10 rounded-full mx-auto lg:mx-0" />
+                      <div className="w-64 h-8 bg-white/10 rounded mx-auto lg:mx-0" />
+                      <div className="flex justify-center lg:justify-start gap-3 mt-4">
+                        {[1, 2, 3, 4].map(i => (
+                          <div key={i} className="w-16 h-16 bg-white/10 rounded-xl" />
                         ))}
                       </div>
-
-                      {/* <Button className="gap-2 bg-gradient-to-r from-green-600 to-emerald-500 neon-glow">
-                        <Calendar className="w-4 h-4" />
-                        Add to Calendar
-                      </Button> */}
                     </div>
-
-                    <div className="flex-1 w-full max-w-2xl">
-                      <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10">
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setPendingSelection('home')}
-                          className={`team-card glass-card rounded-2xl p-6 md:p-8 w-full md:w-auto min-w-[150px] text-center cursor-pointer transition-all border ${pendingSelection === 'home' ? 'selected neon-glow border-green-500/50' : 'border-white/10'
-                            }`}
-                        >
-                          <img
-                            src={selectedMatch?.homeTeam.logo}
-                            alt={selectedMatch?.homeTeam.name}
-                            className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-4 object-contain"
-                          />
-                          <h3 className="font-semibold text-white mb-1">{selectedMatch?.homeTeam.shortName}</h3>
-                          <p className="text-xs text-gray-400">{selectedMatch?.homeTeam.name}</p>
-                          {pendingSelection === 'home' && (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              className="mt-3 flex flex-col items-center gap-1"
-                            >
-                              <CheckCircle2 className="w-5 h-5 mx-auto text-green-400" />
-                              {prediction === 'home' ? (
-                                <span className="text-[10px] text-green-400 font-semibold uppercase tracking-wider">Saved</span>
-                              ) : (
-                                <span className="text-[10px] text-yellow-400 font-semibold uppercase tracking-wider">Unsaved</span>
-                              )}
-                            </motion.div>
-                          )}
-                        </motion.button>
-
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="px-6 py-3 rounded-xl bg-white/5 border border-white/10">
-                            <span className="text-2xl font-bold text-gray-300">VS</span>
-                          </div>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setPendingSelection('draw')}
-                            className={`px-6 py-3 rounded-xl text-sm font-medium cursor-pointer transition-all border flex flex-col items-center gap-1 min-w-[100px] ${pendingSelection === 'draw' ? 'selected neon-glow-yellow bg-yellow-500/10 text-yellow-400 border-yellow-500/50' : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
-                              }`}
-                          >
-                            <span>Draw</span>
-                            {pendingSelection === 'draw' && (
-                              <motion.span
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className={`text-[9px] font-semibold uppercase tracking-wider ${prediction === 'draw' ? 'text-yellow-400' : 'text-orange-400'}`}
-                              >
-                                {prediction === 'draw' ? 'Saved' : 'Unsaved'}
-                              </motion.span>
-                            )}
-                          </motion.button>
-                        </div>
-
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setPendingSelection('away')}
-                          className={`team-card glass-card rounded-2xl p-6 md:p-8 w-full md:w-auto min-w-[150px] text-center cursor-pointer transition-all border ${pendingSelection === 'away' ? 'selected neon-glow-blue border-blue-500/50' : 'border-white/10'
-                            }`}
-                        >
-                          <img
-                            src={selectedMatch?.awayTeam.logo}
-                            alt={selectedMatch?.awayTeam.name}
-                            className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-4 object-contain"
-                          />
-                          <h3 className="font-semibold text-white mb-1">{selectedMatch?.awayTeam.shortName}</h3>
-                          <p className="text-xs text-gray-400">{selectedMatch?.awayTeam?.name}</p>
-                          {pendingSelection === 'away' && (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              className="mt-3 flex flex-col items-center gap-1"
-                            >
-                              <CheckCircle2 className="w-5 h-5 mx-auto text-blue-400" />
-                              {prediction === 'away' ? (
-                                <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">Saved</span>
-                              ) : (
-                                <span className="text-[10px] text-yellow-400 font-semibold uppercase tracking-wider">Unsaved</span>
-                              )}
-                            </motion.div>
-                          )}
-                        </motion.button>
-                      </div>
-                      {pendingSelection !== null && pendingSelection !== prediction && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 15 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="mt-8 flex justify-center"
-                        >
-                          <Button
-                            onClick={() => setConfirmOpen(true)}
-                            className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all scale-105 duration-200 neon-glow"
-                          >
-                            {prediction !== null ? "Update Prediction" : "Confirm Prediction"}
-                          </Button>
-                        </motion.div>
-                      )}
+                    <div className="flex-1 w-full max-w-2xl flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10">
+                      <div className="w-44 h-48 bg-white/10 rounded-2xl" />
+                      <div className="w-12 h-12 bg-white/10 rounded-xl" />
+                      <div className="w-44 h-48 bg-white/10 rounded-2xl" />
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : selectedMatch ? (
+              <div className="glass-card-strong rounded-3xl overflow-hidden">
+                <div className="bg-gradient-to-r from-green-600/10 via-transparent to-blue-600/10 p-1">
+                  <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-3xl p-6 md:p-10">
+                    <div className="flex flex-col lg:flex-row items-center gap-8">
+                      <div className="flex-1 text-center lg:text-left">
+                        <Badge className="mb-4 bg-green-500/10 text-green-400 border-green-500/30">
+                          <span className="pulse-dot inline-block w-2 h-2 rounded-full bg-green-400 mr-2" />
+                          LIVE PREDICTIONS OPEN
+                        </Badge>
+                        <h2 className="text-2xl md:text-3xl font-bold mb-2 text-white">
+                          {selectedMatch.competition}
+                        </h2>
+                        {/* <p className="text-gray-400 mb-6">{selectedMatch.venue}</p> */}
+
+                        <div className="flex justify-center lg:justify-start gap-3 mb-6">
+                          {[
+                            { value: countdown.days, label: 'Days' },
+                            { value: countdown.hours, label: 'Hours' },
+                            { value: countdown.minutes, label: 'Min' },
+                            { value: countdown.seconds, label: 'Sec' },
+                          ].map((item, idx) => (
+                            <motion.div
+                              key={idx}
+                              initial={{ scale: 0.9 }}
+                              animate={{ scale: 1 }}
+                              className="countdown-segment rounded-xl p-3 min-w-[60px] text-center"
+                            >
+                              <div className="text-2xl md:text-3xl font-bold text-gradient">
+                                {String(item.value).padStart(2, '0')}
+                              </div>
+                              <div className="text-xs text-gray-500">{item.label}</div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 w-full max-w-2xl">
+                        <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10">
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setPendingSelection('home')}
+                            className={`team-card glass-card rounded-2xl p-6 md:p-8 w-full md:w-auto min-w-[150px] text-center cursor-pointer transition-all border ${pendingSelection === 'home' ? 'selected neon-glow border-green-500/50' : 'border-white/10'
+                              }`}
+                          >
+                            <img
+                              src={selectedMatch.homeTeam.logo}
+                              alt={selectedMatch.homeTeam.name}
+                              className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-4 object-contain"
+                            />
+                            <h3 className="font-semibold text-white mb-1">{selectedMatch.homeTeam.shortName}</h3>
+                            <p className="text-xs text-gray-400">{selectedMatch.homeTeam.name}</p>
+                            {pendingSelection === 'home' && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="mt-3 flex flex-col items-center gap-1"
+                              >
+                                <CheckCircle2 className="w-5 h-5 mx-auto text-green-400" />
+                                {prediction === 'home' ? (
+                                  <span className="text-[10px] text-green-400 font-semibold uppercase tracking-wider">Saved</span>
+                                ) : (
+                                  <span className="text-[10px] text-yellow-400 font-semibold uppercase tracking-wider">Unsaved</span>
+                                )}
+                              </motion.div>
+                            )}
+                          </motion.button>
+
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="px-6 py-3 rounded-xl bg-white/5 border border-white/10">
+                              <span className="text-2xl font-bold text-gray-300">VS</span>
+                            </div>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setPendingSelection('draw')}
+                              className={`px-6 py-3 rounded-xl text-sm font-medium cursor-pointer transition-all border flex flex-col items-center gap-1 min-w-[100px] ${pendingSelection === 'draw' ? 'selected neon-glow-yellow bg-yellow-500/10 text-yellow-400 border-yellow-500/50' : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
+                                }`}
+                            >
+                              <span>Draw</span>
+                              {pendingSelection === 'draw' && (
+                                <motion.span
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  className={`text-[9px] font-semibold uppercase tracking-wider ${prediction === 'draw' ? 'text-yellow-400' : 'text-orange-400'}`}
+                                >
+                                  {prediction === 'draw' ? 'Saved' : 'Unsaved'}
+                                </motion.span>
+                              )}
+                            </motion.button>
+                          </div>
+
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setPendingSelection('away')}
+                            className={`team-card glass-card rounded-2xl p-6 md:p-8 w-full md:w-auto min-w-[150px] text-center cursor-pointer transition-all border ${pendingSelection === 'away' ? 'selected neon-glow-blue border-blue-500/50' : 'border-white/10'
+                              }`}
+                          >
+                            <img
+                              src={selectedMatch.awayTeam.logo}
+                              alt={selectedMatch.awayTeam.name}
+                              className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-4 object-contain"
+                            />
+                            <h3 className="font-semibold text-white mb-1">{selectedMatch.awayTeam.shortName}</h3>
+                            <p className="text-xs text-gray-400">{selectedMatch.awayTeam.name}</p>
+                            {pendingSelection === 'away' && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="mt-3 flex flex-col items-center gap-1"
+                              >
+                                <CheckCircle2 className="w-5 h-5 mx-auto text-blue-400" />
+                                {prediction === 'away' ? (
+                                  <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">Saved</span>
+                                ) : (
+                                  <span className="text-[10px] text-yellow-400 font-semibold uppercase tracking-wider">Unsaved</span>
+                                )}
+                              </motion.div>
+                            )}
+                          </motion.button>
+                        </div>
+                        {pendingSelection !== null && pendingSelection !== prediction && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-8 flex justify-center"
+                          >
+                            <Button
+                              onClick={() => setConfirmOpen(true)}
+                              className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all scale-105 duration-200 neon-glow"
+                            >
+                              {prediction !== null ? "Update Prediction" : "Confirm Prediction"}
+                            </Button>
+                          </motion.div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="glass-card-strong rounded-3xl p-10 text-center text-gray-400 border border-white/10">
+                <Trophy className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-white mb-1">No Matches Scheduled</h3>
+                <p className="text-sm">There are no upcoming or active prediction matches at the moment.</p>
+              </div>
+            )}
           </motion.section>
 
-          {upcomingMatches.length > 0 && (
+          {(isUpcomingMatchesLoading || upcomingMatches.length > 0) && (
             <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -537,54 +564,62 @@ const Dashboard: React.FC = () => {
                   View All <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {upcomingMatches.map((match, idx) => (
-                  <motion.div
-                    key={match.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 * idx }}
-                  >
-                    <Card
-                      onClick={() => setSelectedMatch(match)}
-                      className={`glass-card p-5 group hover:border-green-500/30 transition-all cursor-pointer border ${selectedMatch?.id === match.id ? 'border-green-500/50 ring-1 ring-green-500/30' : 'border-white/10'
-                        }`}
+              {isUpcomingMatchesLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="glass-card p-6 rounded-2xl h-48 animate-pulse bg-white/5 border border-white/10" />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {upcomingMatches.map((match, idx) => (
+                    <motion.div
+                      key={match.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 * idx }}
                     >
-                      <div className="flex items-center justify-between mb-4">
-                        <Badge variant="secondary" className="bg-blue-500/10 text-blue-400">
-                          {match.competition}
-                        </Badge>
-                        <span className="text-xs text-gray-500">{match.date}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="text-center flex-1">
-                          <img src={match.homeTeam.logo} alt="" className="w-12 h-12 mx-auto mb-2 object-contain" />
-                          <p className="text-sm font-medium text-gray-200">{match.homeTeam.shortName}</p>
-                        </div>
-                        <div className="px-4">
-                          <span className="text-lg font-bold text-gray-400">VS</span>
-                        </div>
-                        <div className="text-center flex-1">
-                          <img src={match.awayTeam.logo} alt="" className="w-12 h-12 mx-auto mb-2 object-contain" />
-                          <p className="text-sm font-medium text-gray-200">{match.awayTeam.shortName}</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
-                        <span className="text-xs text-gray-500">{match.time}</span>
-                        {predHistory.find(p => p.matchId === match.id) ? (
-                          <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Predicted
+                      <Card
+                        onClick={() => setSelectedMatch(match)}
+                        className={`glass-card p-5 group hover:border-green-500/30 transition-all cursor-pointer border ${selectedMatch?.id === match.id ? 'border-green-500/50 ring-1 ring-green-500/30' : 'border-white/10'
+                          }`}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <Badge variant="secondary" className="bg-blue-500/10 text-blue-400">
+                            {match.competition}
                           </Badge>
-                        ) : (
-                          <Button variant="ghost" size="sm" className="text-green-400 group-hover:text-green-300">
-                            Predict <ArrowUpRight className="w-3 h-3 ml-1" />
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
+                          <span className="text-xs text-gray-500">{match.date}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-center flex-1">
+                            <img src={match.homeTeam.logo} alt="" className="w-12 h-12 mx-auto mb-2 object-contain" />
+                            <p className="text-sm font-medium text-gray-200">{match.homeTeam.shortName}</p>
+                          </div>
+                          <div className="px-4">
+                            <span className="text-lg font-bold text-gray-400">VS</span>
+                          </div>
+                          <div className="text-center flex-1">
+                            <img src={match.awayTeam.logo} alt="" className="w-12 h-12 mx-auto mb-2 object-contain" />
+                            <p className="text-sm font-medium text-gray-200">{match.awayTeam.shortName}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
+                          <span className="text-xs text-gray-500">{match.time}</span>
+                          {predHistory.find(p => p.matchId === match.id) ? (
+                            <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Predicted
+                            </Badge>
+                          ) : (
+                            <Button variant="ghost" size="sm" className="text-green-400 group-hover:text-green-300">
+                              Predict <ArrowUpRight className="w-3 h-3 ml-1" />
+                            </Button>
+                          )}
+                        </div>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </motion.section>
           )}
 
@@ -600,7 +635,9 @@ const Dashboard: React.FC = () => {
                     <Target className="w-4 h-4 text-green-400" />
                     Your Prediction Stats
                   </h3>
-                  {topPercentage !== null ? (
+                  {isLeaderboardLoading ? (
+                    <div className="w-16 h-5 bg-white/10 rounded animate-pulse" />
+                  ) : topPercentage !== null ? (
                     <Badge variant="secondary" className="bg-green-500/10 text-green-400">
                       Top {topPercentage}%
                     </Badge>
@@ -610,23 +647,31 @@ const Dashboard: React.FC = () => {
                     </Badge>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 rounded-xl bg-white/5">
-                    <div className="text-2xl font-bold text-blue-400">{userRank?.predictions || 0}</div>
-                    <p className="text-xs text-gray-400">Predictions</p>
+                {isLeaderboardLoading ? (
+                  <div className="flex-1 flex items-center justify-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin text-green-400" />
                   </div>
-                  <div className="text-center p-3 rounded-xl bg-white/5">
-                    <div className="text-2xl font-bold text-green-400">{userRank?.points || 0}</div>
-                    <p className="text-xs text-gray-400">Won</p>
-                  </div>
-                </div>
-                <div className="mt-auto pt-4">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">{nextPlayer ? "Progress to next rank" : "Top Rank!"}</span>
-                    <span className="text-green-400">{nextPlayer ? `${pointsToNext} pts away` : 'Maxed out'}</span>
-                  </div>
-                  <Progress value={progressToNext} className="h-2" />
-                </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 rounded-xl bg-white/5">
+                        <div className="text-2xl font-bold text-blue-400">{userRank?.predictions || 0}</div>
+                        <p className="text-xs text-gray-400">Predictions</p>
+                      </div>
+                      <div className="text-center p-3 rounded-xl bg-white/5">
+                        <div className="text-2xl font-bold text-green-400">{userRank?.points || 0}</div>
+                        <p className="text-xs text-gray-400">Won</p>
+                      </div>
+                    </div>
+                    <div className="mt-auto pt-4">
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-400">{nextPlayer ? "Progress to next rank" : "Top Rank!"}</span>
+                        <span className="text-green-400">{nextPlayer ? `${pointsToNext} pts away` : 'Maxed out'}</span>
+                      </div>
+                      <Progress value={progressToNext} className="h-2" />
+                    </div>
+                  </>
+                )}
               </Card>
             </motion.div>
 
@@ -645,42 +690,50 @@ const Dashboard: React.FC = () => {
                     View All <ChevronRight className="w-3 h-3" />
                   </Button>
                 </div>
-                <div className="space-y-3">
-                  {predHistory.map((pred) => {
-                    const match = pred.match;
-                    return (
-                      <div key={pred.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
-                        <div className="flex items-center gap-3">
-                          <div className="flex -space-x-2">
-                            <img src={match?.homeTeam.logo} alt="" className="w-6 h-6 rounded-full bg-gray-800 p-0.5" />
-                            <img src={match?.awayTeam.logo} alt="" className="w-6 h-6 rounded-full bg-gray-800 p-0.5" />
+                {isHistoryLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <RefreshCw className="w-6 h-6 animate-spin text-orange-400" />
+                  </div>
+                ) : predHistory.length === 0 ? (
+                  <p className="text-gray-500 text-center py-10 text-sm">No predictions yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {predHistory.map((pred) => {
+                      const match = pred.match;
+                      return (
+                        <div key={pred.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                          <div className="flex items-center gap-3">
+                            <div className="flex -space-x-2">
+                              <img src={match?.homeTeam.logo} alt="" className="w-6 h-6 rounded-full bg-gray-800 p-0.5" />
+                              <img src={match?.awayTeam.logo} alt="" className="w-6 h-6 rounded-full bg-gray-800 p-0.5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-200">
+                                {match?.homeTeam.shortName} vs {match?.awayTeam.shortName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {pred.predictedWinner === 'home'
+                                  ? match?.homeTeam.shortName
+                                  : pred.predictedWinner === 'away'
+                                    ? match?.awayTeam.shortName
+                                    : 'Draw'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-200">
-                              {match?.homeTeam.shortName} vs {match?.awayTeam.shortName}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {pred.predictedWinner === 'home'
-                                ? match?.homeTeam.shortName
-                                : pred.predictedWinner === 'away'
-                                  ? match?.awayTeam.shortName
-                                  : 'Draw'}
-                            </p>
-                          </div>
+                          {pred.isCorrect === undefined ? (
+                            <Badge className="bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                              Pending
+                            </Badge>
+                          ) : (
+                            <Badge className={pred.isCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
+                              {pred.isCorrect ? '+10' : '0'}
+                            </Badge>
+                          )}
                         </div>
-                        {pred.isCorrect === undefined ? (
-                          <Badge className="bg-gray-500/20 text-gray-400 border border-gray-500/30">
-                            Pending
-                          </Badge>
-                        ) : (
-                          <Badge className={pred.isCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
-                            {pred.isCorrect ? '+10' : '0'}
-                          </Badge>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </Card>
             </motion.div>
 
@@ -699,29 +752,37 @@ const Dashboard: React.FC = () => {
                     Full Rankings <ArrowUpRight className="w-3 h-3" />
                   </Button>
                 </div>
-                <div className="space-y-2">
-                  {leaderboardList.slice(0, 5).map((entry, idx) => (
-                    <div
-                      key={entry.userId}
-                      className={`flex items-center justify-between p-3 rounded-lg ${(entry.userId === userProfile?.id || entry.userName === userProfile?.name) ? 'bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/20' : 'bg-white/5'
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-500 text-black' :
-                          idx === 1 ? 'bg-gray-300 text-black' :
-                            idx === 2 ? 'bg-amber-600 text-black' :
-                              'bg-gray-700 text-white'
-                          }`}>
-                          {entry.rank}
+                {isLeaderboardLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
+                  </div>
+                ) : leaderboardList.length === 0 ? (
+                  <p className="text-gray-500 text-center py-10 text-sm">No rankings yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {leaderboardList.slice(0, 6).map((entry, idx) => (
+                      <div
+                        key={entry.userId}
+                        className={`flex items-center justify-between p-3 rounded-lg ${(entry.userId === userProfile?.id || entry.userName === userProfile?.name) ? 'bg-gradient-to-r from-green-500/10 to-blue-500/10 border border-green-500/20' : 'bg-white/5'
+                          }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-500 text-black' :
+                            idx === 1 ? 'bg-gray-300 text-black' :
+                              idx === 2 ? 'bg-amber-600 text-black' :
+                                'bg-gray-700 text-white'
+                            }`}>
+                            {entry.rank}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-200">{entry.userName}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-200">{entry.userName}</p>
-                        </div>
+                        <span className="font-semibold text-green-400">{entry.points * 10} pts</span>
                       </div>
-                      <span className="font-semibold text-green-400">{entry.points * 10} pts</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </Card>
             </motion.div>
           </div>

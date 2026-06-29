@@ -85,24 +85,6 @@ const mapBackendMatchToFrontend = (m: any): Match => {
   };
 };
 
-const mapBackendPredictionToFrontend = (p: any): Prediction => {
-  const match = p.match;
-  let predictedWinner: 'home' | 'away' | 'draw' = 'draw';
-  if (match) {
-    if (p.winning_team_id === match.team1_id) predictedWinner = 'home';
-    else if (p.winning_team_id === match.team2_id) predictedWinner = 'away';
-  }
-  return {
-    id: p.id,
-    matchId: p.match_id,
-    userId: p.user_id,
-    predictedWinner,
-    createdAt: p.submitted_at,
-    points: p.is_correct ? 10 : 0,
-    isCorrect: p.is_correct ?? undefined,
-    match: match ? mapBackendMatchToFrontend(match) : undefined,
-  };
-};
 
 // ─── Tab config ──────────────────────────────────────────────────────────────
 

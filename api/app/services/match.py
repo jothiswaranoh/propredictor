@@ -30,6 +30,13 @@ class MatchService:
         team1_resp = TeamResponse.model_validate(team1) if team1 else None
         team2_resp = TeamResponse.model_validate(team2) if team2 else None
         
+        now = datetime.utcnow()
+        is_live = (
+            match.status == "upcoming" and
+            match.prediction_open_time <= now <= match.prediction_close_time
+        )
+        status_str = "live" if is_live else match.status
+
         return MatchDetailResponse(
             id=str(match.id),
             team1_id=str(match.team1_id),
@@ -39,7 +46,7 @@ class MatchService:
             match_date=match.match_date,
             prediction_open_time=match.prediction_open_time,
             prediction_close_time=match.prediction_close_time,
-            status=match.status,
+            status=status_str,
             winning_team_id=str(match.winning_team_id) if match.winning_team_id else None,
             created_at=match.created_at,
             user_prediction=user_prediction
@@ -202,13 +209,7 @@ class MatchService:
                         "status": {"$ne": "completed"}
                     }
                 elif status == "upcoming":
-                    status_filter = {
-                        "status": "upcoming",
-                        "$or": [
-                            {"prediction_open_time": {"$gt": now}},
-                            {"prediction_close_time": {"$lt": now}}
-                        ]
-                    }
+                    status_filter = {"status": "upcoming"}
                 elif status == "completed":
                     status_filter = {"status": "completed"}
             else:
@@ -287,13 +288,7 @@ class MatchService:
                 "prediction_close_time": {"$gte": now},
                 "status": {"$ne": "completed"}
             })
-            upcoming_count = await self.match_repo.collection.count_documents({
-                "status": "upcoming",
-                "$or": [
-                    {"prediction_open_time": {"$gt": now}},
-                    {"prediction_close_time": {"$lt": now}}
-                ]
-            })
+            upcoming_count = await self.match_repo.collection.count_documents({"status": "upcoming"})
             all_count = await self.match_repo.collection.count_documents({})
             tab_counts = {
                 "all": all_count,

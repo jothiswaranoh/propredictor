@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Plus, Search, RefreshCw, MoreVertical, Edit, Trash2, Eye, EyeOff
-} from 'lucide-react';
+import { Plus, Search, RefreshCw, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card } from '../../components/ui/card';
@@ -44,7 +43,7 @@ const AdminUsers: React.FC = () => {
   const [debouncedUserSearch, setDebouncedUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
   const [userActiveFilter, setUserActiveFilter] = useState<boolean | null>(null);
-  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+
 
   // Add/Edit User Form States
   const [newUserName, setNewUserName] = useState('');
@@ -54,12 +53,7 @@ const AdminUsers: React.FC = () => {
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
 
-  const togglePasswordVisibility = (userId: string) => {
-    setVisiblePasswords(prev => ({
-      ...prev,
-      [userId]: !prev[userId]
-    }));
-  };
+
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -148,28 +142,7 @@ const AdminUsers: React.FC = () => {
         </div>
       )
     },
-    {
-      key: 'password',
-      label: 'Password',
-      render: (value: any, row: any) => {
-        const isVisible = visiblePasswords[row.id];
-        return (
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm tracking-wider">
-              {isVisible ? String(value) : '••••••••'}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-white/5"
-              onClick={() => togglePasswordVisibility(row.id)}
-            >
-              {isVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </Button>
-          </div>
-        );
-      }
-    },
+
     {
       key: 'role',
       label: 'Role',
