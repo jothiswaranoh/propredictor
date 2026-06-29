@@ -105,7 +105,7 @@ class LeaderboardService:
                     },
                     "has_prediction": {
                         "$cond": [
-                            { "$ifNull": ["$predictions._id", False] },
+                            { "$ne": [{ "$type": "$predictions._id" }, "missing"] },
                             1,
                             0
                         ]
